@@ -1,0 +1,47 @@
+services:
+  web:
+    build: .
+    container_name: webserv01
+    ports:
+      - "80:8080"
+    restart: unless-stopped
+
+    # Runtime security hardening
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+    environment:
+      # ---- PHP overrides (set only what you need) ----
+      PHP_MEMORY_LIMIT: 256M
+      PHP_UPLOAD_MAX_FILESIZE: 2000M
+      PHP_POST_MAX_SIZE: 2000M
+      PHP_MAX_EXECUTION_TIME: 120
+      OPCACHE_ENABLE: "0"            # keep opcache disabled as requested
+      PHP_TZ: "Europe/Copenhagen"    # optional
+
+      # ---- Optional toggles (uncomment if/when needed) ----
+      # APACHE_SERVER_NAME: "example.com"
+      # TRUSTED_PROXIES: "172.20.0.5"
+      # HSTS: "max-age=31536000; includeSubDomains"
+      # CSP_REPORT_ONLY: "default-src 'self'; img-src 'self' data:; object-src 'none'"
+      # CSP: "default-src 'self'; img-src 'self' data:; object-src 'none'"
+      # APP_WRITABLE_DIRS: "/var/www/html/uploads /var/www/html/cache"
+
+      # ---- Mail config (use secret for password) ----
+      MAIL_HOST: "smtp.example.com"
+      MAIL_PORT: "587"
+      MAIL_SECURE: "tls"
+      MAIL_USER: "user@example.com"
+      MAIL_PASS_FILE: "/run/secrets/mail_pass"
+
+    secrets:
+      - mail_pass
+
+secrets:
+  mail_pass:
+    file: ./secrets/mail_pass.txt

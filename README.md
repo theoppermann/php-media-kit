@@ -19,29 +19,29 @@ Hardened Docker setup for **PHP 8.3 + Apache** with:
 git clone <YOUR_GIT_REMOTE_URL>
 cd <your-project-folder>
 ```
-# Create the mail secret
+### Create the mail secret
 ```
 mkdir -p secrets
 echo "super-secret-password" > secrets/mail_pass.txt
 ```
 
-# Build and start
+### Build and start
 ```
 docker compose build --no-cache
 docker compose up -d
 ```
 
-# View logs
+### View logs
 ```
 docker logs -f <the name of the container>
 ```
 
-# Check the container name with:
+### Check the container name with:
 ```
 docker ps
 ```
 
-#### Verification
+### Verification
 ```
 docker exec -it <the name of the container> sh -lc '
 php -m | grep -E "PDO|pdo_mysql|pdo_sqlite|zip|imagick";
@@ -52,7 +52,7 @@ php -r "require \"/usr/local/lib/php-vendor/phpmailer/autoload.php\"; echo \"PHP
 '
 
 ```
-# Expected output:
+### Expected output:
 ```
 PDO, pdo_mysql, pdo_sqlite, zip, imagick
 opcache.enable => Off
@@ -60,11 +60,11 @@ HEIC / AVIF listed in ImageMagick
 hevc codecs listed in ffmpeg
 PHPMailer OK
 ```
-#### Configuration
+### Configuration
 
 Edit docker-compose.yml to set environment variables:
 
-# PHP
+### PHP
 ```
 PHP_MEMORY_LIMIT
 PHP_UPLOAD_MAX_FILESIZE
@@ -74,7 +74,7 @@ OPCACHE_ENABLE
 PHP_TZ
 ```
 
-# Optional
+### Optional
 ```
 APACHE_SERVER_NAME
 TRUSTED_PROXIES
@@ -82,7 +82,7 @@ HSTS
 CSP
 APP_WRITABLE_DIRS
 ```
-# Mail
+### Mail
 ```
 MAIL_HOST
 MAIL_PORT
@@ -90,7 +90,7 @@ MAIL_SECURE
 MAIL_USER
 MAIL_PASS_FILE=/run/secrets/mail_pass
 ```
-#### Notes
+### Notes
 
 - Logs: docker logs <the name of the container>
 - Exec: docker exec -it <the name of the container> sh

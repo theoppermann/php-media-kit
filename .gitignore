@@ -1,0 +1,25 @@
+# ------------------------------
+# Editor junk
+# ------------------------------
+.vscode/           # VS Code workspace settings
+*.swp              # swapfiler fra nano/vim
+
+# ------------------------------
+# Environment & secrets
+# ------------------------------
+.env               # lokale miljøvariabler (fx container_name)
+secrets/           # mail_pass.txt og andre hemmeligheder
+
+# ------------------------------
+# Docker & runtime junk
+# ------------------------------
+*.log              # runtime logs
+*.tmp              # midlertidige temp-filer
+tmp/               # midlertidig mappe
+.cache/            # cache (fx composer eller apt)
+
+# ------------------------------
+# Runtime data (persist via volumes, aldrig i Git)
+# ------------------------------
+uploads/           # brugeruploads
+cache/             # applikations-cache

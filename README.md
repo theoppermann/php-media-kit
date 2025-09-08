@@ -64,17 +64,17 @@ PHPMailer OK
 
 Edit docker-compose.yml to set environment variables:
 
-- PHP
+- PHP i this is empty it will fallback to defaults
 ```
-PHP_MEMORY_LIMIT
-PHP_UPLOAD_MAX_FILESIZE
-PHP_POST_MAX_SIZE
-PHP_MAX_EXECUTION_TIME
-OPCACHE_ENABLE
-PHP_TZ
+PHP_MEMORY_LIMIT:
+PHP_UPLOAD_MAX_FILESIZE:
+PHP_POST_MAX_SIZE:
+PHP_MAX_EXECUTION_TIME:
+OPCACHE_ENABLE:
+PHP_TZ:
 ```
 
-- Optional
+- Optional toggles (uncomment if/when needed)
 ```
 APACHE_SERVER_NAME
 TRUSTED_PROXIES
@@ -82,13 +82,13 @@ HSTS
 CSP
 APP_WRITABLE_DIRS
 ```
-- Mail
+- Mail Remember to use your own mail info
 ```
-MAIL_HOST
-MAIL_PORT
-MAIL_SECURE
-MAIL_USER
-MAIL_PASS_FILE=/run/secrets/mail_pass
+MAIL_HOST: "smtp.example.com"
+MAIL_PORT: "587"
+MAIL_SECURE: "tls"
+MAIL_USER: "user@example.com"
+MAIL_PASS_FILE: "/run/secrets/mail_pass"
 ```
 ### Notes
 
@@ -97,4 +97,4 @@ MAIL_PASS_FILE=/run/secrets/mail_pass
 - Root filesystem is read-only
 - /tmp is mounted as tmpfs
 - Only directories listed in APP_WRITABLE_DIRS are writable
-- Keep secrets/ out of Git (add it to .gitignore)
+- Keep secrets and userdata / cache out of Git (add it to .gitignore)

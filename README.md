@@ -82,7 +82,7 @@ HSTS
 CSP
 APP_WRITABLE_DIRS
 ```
-- Mail Remember to use your own mail info
+- Mail: Remember to use your own mail info and put passwords in secrets.
 ```
 MAIL_HOST: "smtp.example.com"
 MAIL_PORT: "587"

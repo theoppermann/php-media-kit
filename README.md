@@ -64,28 +64,32 @@ PHPMailer OK
 
 Edit docker-compose.yml to set environment variables:
 
-#PHP
+# PHP
+```
 PHP_MEMORY_LIMIT
 PHP_UPLOAD_MAX_FILESIZE
 PHP_POST_MAX_SIZE
 PHP_MAX_EXECUTION_TIME
 OPCACHE_ENABLE
 PHP_TZ
+```
 
 # Optional
+```
 APACHE_SERVER_NAME
 TRUSTED_PROXIES
 HSTS
 CSP
 APP_WRITABLE_DIRS
-
-#Mail
+```
+# Mail
+```
 MAIL_HOST
 MAIL_PORT
 MAIL_SECURE
 MAIL_USER
 MAIL_PASS_FILE=/run/secrets/mail_pass
-
+```
 #### Notes
 
 - Logs: docker logs <the name of the container>

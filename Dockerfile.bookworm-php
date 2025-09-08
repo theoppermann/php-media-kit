@@ -1,0 +1,84 @@
+# syntax=docker/dockerfile:1.7
+
+############################
+# Stage 1: PHPMailer vendor
+############################
+FROM composer:2 AS deps
+WORKDIR /app
+RUN composer init --no-interaction --name=temp/temp \
+ && composer require --no-interaction --no-plugins --no-scripts phpmailer/phpmailer:^6.9 \
+ && composer dump-autoload --optimize
+
+############################
+# Stage 2: Runtime (PHP 8.3 on Bookworm)
+############################
+FROM php:8.3-apache-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive TZ=Europe/Copenhagen \
+    PHP_INI_SCAN_DIR="/usr/local/etc/php/conf.d:/tmp/php-conf.d" \
+    CFLAGS="-Wno-deprecated-declarations" \
+    CPPFLAGS="-Wno-deprecated-declarations"
+
+# Runtime libs (IM6 + HEIC/AVIF + ffmpeg + zip)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates tzdata curl \
+      imagemagick libheif1 libde265-0 libmagickwand-6.q16-6 \
+      ffmpeg zip \
+      libsqlite3-0 libzip4 zlib1g \
+ && rm -rf /var/lib/apt/lists/*
+
+# PHP ext + PECL imagick 3.8.0
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-6.q16-dev \
+ && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_sqlite zip \
+ && pecl install imagick-3.8.0 \
+ && docker-php-ext-enable imagick \
+ && apt-get purge -y $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-6.q16-dev \
+ && apt-get autoremove -y \
+ && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# OPcache off
+RUN printf "opcache.enable=0\nopcache.enable_cli=0\n" \
+  > /usr/local/etc/php/conf.d/zz-opcache-off.ini
+
+# Apache hardening + logs + port 8080
+RUN a2enmod rewrite headers deflate expires remoteip && a2dismod -f autoindex status && \
+    { echo 'ErrorLog /proc/self/fd/2'; echo 'CustomLog /proc/self/fd/1 combined'; } \
+      > /etc/apache2/conf-available/log-to-stdout.conf && a2enconf log-to-stdout && \
+    sed -ri 's/^Listen 80/Listen 8080/' /etc/apache2/ports.conf && \
+    sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:8080>#' /etc/apache2/sites-available/000-default.conf && \
+    { \
+      echo "ServerTokens Prod"; \
+      echo "ServerSignature Off"; \
+      echo "TraceEnable Off"; \
+      echo 'Header always set X-Content-Type-Options "nosniff"'; \
+      echo 'Header always set X-Frame-Options "DENY"'; \
+      echo 'Header always set Referrer-Policy "no-referrer-when-downgrade"'; \
+      echo 'Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"'; \
+    } > /etc/apache2/conf-available/security.conf && a2enconf security
+
+# Health endpoint
+RUN printf "<?php http_response_code(200); echo 'OK';" > /var/www/html/health.php
+
+# PHPMailer (kun vendor ind)
+RUN mkdir -p /usr/local/lib/php-vendor
+COPY --from=deps /app/vendor /usr/local/lib/php-vendor/phpmailer
+
+# Entrypoint
+COPY docker-php-entrypoint.sh /usr/local/bin/docker-php-entrypoint
+RUN chmod +x /usr/local/bin/docker-php-entrypoint
+
+# RO-perms + non-root
+RUN chown -R root:root /var/www \
+ && find /var/www -type d -exec chmod 755 {} \; \
+ && find /var/www -type f -exec chmod 644 {} \;
+
+WORKDIR /var/www/html
+USER www-data
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -fsS http://localhost:8080/health.php || exit 1
+
+ENTRYPOINT ["docker-php-entrypoint"]
+CMD ["apache2ctl","-D","FOREGROUND"]

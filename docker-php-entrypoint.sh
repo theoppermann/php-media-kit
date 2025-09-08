@@ -2,13 +2,13 @@
 set -e
 umask 027
 
-# Apache på tmpfs (RO-rootfs venligt)
+# Apache on tmpfs (RO-rootfs friendly)
 export APACHE_RUN_DIR=/tmp/apache2
 export APACHE_LOCK_DIR=/tmp/apache2
 export APACHE_PID_FILE=/tmp/apache2/apache2.pid
 mkdir -p "$APACHE_RUN_DIR"
 
-# PHP overrides (skriv kun til /tmp; kræver at PHP_INI_SCAN_DIR inkluderer /tmp/php-conf.d)
+# PHP overrides (write only to /tmp; requires PHP_INI_SCAN_DIR to include /tmp/php-conf.d)
 mkdir -p /tmp/php-conf.d
 : > /tmp/php-conf.d/zz-runtime.ini
 [ -n "$PHP_MEMORY_LIMIT" ]        && echo "memory_limit=$PHP_MEMORY_LIMIT" >> /tmp/php-conf.d/zz-runtime.ini
@@ -18,11 +18,11 @@ mkdir -p /tmp/php-conf.d
 [ -n "$PHP_TZ" ]                  && echo "date.timezone=$PHP_TZ" >> /tmp/php-conf.d/zz-runtime.ini
 [ -n "$OPCACHE_ENABLE" ]          && echo "opcache.enable=$OPCACHE_ENABLE" >> /tmp/php-conf.d/zz-runtime.ini
 
-# Byg apache2ctl kommando (ingen writes til /etc)
+# Build apache2ctl command (no writes to /etc)
 set -- apache2ctl -D FOREGROUND
 [ -n "$APACHE_SERVER_NAME" ] && set -- "$@" -c "ServerName ${APACHE_SERVER_NAME}"
 
-# Proxy awareness (kræver a2enmod remoteip hvis du bruger det)
+# Proxy awareness (requires a2enmod remoteip if you use it)
 if [ -n "$TRUSTED_PROXIES" ]; then
   set -- "$@" -c "RemoteIPHeader X-Forwarded-For"
   for ip in $TRUSTED_PROXIES; do
@@ -31,12 +31,12 @@ if [ -n "$TRUSTED_PROXIES" ]; then
   set -- "$@" -c "SetEnvIfNoCase X-Forwarded-Proto https HTTPS=on"
 fi
 
-# Sikkerheds-headere (opt-in)
+# Security headers (opt-in)
 [ -n "$HSTS" ]            && set -- "$@" -c "Header always set Strict-Transport-Security \"${HSTS}\" env=HTTPS"
 [ -n "$CSP" ]             && set -- "$@" -c "Header always set Content-Security-Policy \"${CSP}\""
 [ -n "$CSP_REPORT_ONLY" ] && set -- "$@" -c "Header always set Content-Security-Policy-Report-Only \"${CSP_REPORT_ONLY}\""
 
-# App-writable dirs (undgå chown som non-root)
+# App-writable dirs (avoid chown as non-root)
 if [ -n "$APP_WRITABLE_DIRS" ]; then
   for d in $APP_WRITABLE_DIRS; do
     mkdir -p "$d" || true

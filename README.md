@@ -69,7 +69,6 @@ Replace <override> with one of:
 ```
 docker compose -f docker-compose.yml -f <override> build --no-cache --pull
 ```
----
 
 #### Run
 ```

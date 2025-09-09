@@ -1,0 +1,10 @@
+NOTICE
+Copyright (c) 2025 Gorm Oppermann
+
+This repository contains configuration and packaging (Dockerfiles, entrypoint,
+compose files, and documentation) prepared by Gorm Oppermann.
+
+It uses third-party software that is licensed separately by its respective
+authors (e.g., Debian, PHP, Apache HTTP Server, ImageMagick, php-imagick,
+FFmpeg, PHPMailer). No claim of authorship is made for those components.
+See THIRD_PARTY_NOTICES.md and /usr/share/doc/*/copyright in the built images.

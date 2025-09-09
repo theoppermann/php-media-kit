@@ -22,7 +22,7 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 - **Bookworm – php:8.3-apache:** `docker-compose.bookworm-php.yml`  
   Debian 12 base • PHP **8.3** (from `php:*`) • ImageMagick **6** • PECL `imagick` **3.8.0**
 
-#### Common features (all variants)
+### Common features (all variants)
 
 - PDO (`pdo_mysql`, `pdo_sqlite`)
 - Imagick with **HEIC/AVIF** support
@@ -42,17 +42,17 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 
 ## Setup
 
-### Clone the repository
+#### Clone the repository
 ```
 git clone <YOUR_GIT_REMOTE_URL>
 cd <your-project-folder>
 ```
-### Create the mail secret
+#### Create the mail secret
 ```
 mkdir -p secrets
 echo "super-secret-password" > secrets/mail_pass.txt
 ```
-### Build & run
+#### Build & run
 
 Replace <override> with one of:
 
@@ -64,28 +64,28 @@ Replace <override> with one of:
 
 - docker-compose.bookworm-debian.yml
 ```
-# Build
+#### Build
 docker compose -f docker-compose.yml -f <override> build --no-cache --pull
 
-# Run
+#### Run
 docker compose -f docker-compose.yml -f <override> up -d
 
-# Stop
+#### Stop
 
 docker compose -f docker-compose.yml -f <override> down
 
-### View logs
+#### View logs
 ```
 docker logs -f <the name of the container> or
 docker compose -f docker-compose.yml -f <override> logs -f
 ```
 
-### Check the container name with:
+#### Check the container name with:
 ```
 docker ps
 ```
 
-### Verification
+#### Verification
 ```
 docker exec -it <the name of the container> sh -lc '
 php -m | grep -E "PDO|pdo_mysql|pdo_sqlite|zip|imagick";
@@ -96,7 +96,7 @@ php -r "require \"/usr/local/lib/php-vendor/phpmailer/autoload.php\"; echo \"PHP
 '
 
 ```
-### Expected output:
+#### Expected output:
 ```
 PDO, pdo_mysql, pdo_sqlite, zip, imagick
 opcache.enable => Off
@@ -104,7 +104,7 @@ HEIC / AVIF listed in ImageMagick
 hevc codecs listed in ffmpeg
 PHPMailer OK
 ```
-### Configuration
+#### Configuration
 
 Edit docker-compose.yml to set environment variables:
 

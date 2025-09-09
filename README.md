@@ -22,7 +22,7 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 - **Bookworm – php:8.3-apache:** `docker-compose.bookworm-php.yml`  
   Debian 12 base • PHP **8.3** (from `php:*`) • ImageMagick **6** • PECL `imagick` **3.8.0**
 
-## Common features (all variants)
+#### Common features (all variants)
 
 - PDO (`pdo_mysql`, `pdo_sqlite`)
 - Imagick with **HEIC/AVIF** support
@@ -32,7 +32,7 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 - **OPcache disabled by default**
 - Runs as **non-root** and supports **read-only** root filesystem
 
-## Quick choose
+### Quick choose
 
 - Want newest Debian stack and **apt-only** updates? → **`docker-compose.trixie-debian.yml`** (recommended)  
 - Must stay on Debian 12? → **`docker-compose.bookworm-debian.yml`**  
@@ -40,7 +40,7 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 
 ---
 
-#### Setup
+## Setup
 
 ### Clone the repository
 ```

@@ -45,8 +45,8 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 
 #### Clone the repository
 ```
-git clone <YOUR_GIT_REMOTE_URL>
-cd <your-project-folder>
+git clone git@github.com:theoppermann/php-apache-imagick-ffmpeg.git
+cd php-apache-imagick-ffmpeg
 ```
 #### Create the mail secret
 ```

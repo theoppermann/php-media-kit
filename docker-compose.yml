@@ -5,20 +5,21 @@ services:
       context: .        # <— Dockerfile is chosen by overridefile
     ports:
       - "80:8080"
-    restart: unless-stopped
-
+    restart: unless-stopped 
     # Security hardening
     read_only: true
     tmpfs:
       - /tmp:mode=1777
-      - /var/run/apache2
-      - /var/lock/apache2
+      - /var/run/apache2:mode=1777,uid=33,gid=33
+      - /var/lock/apache2:mode=1777,uid=33,gid=33
+      - /var/log/apache2:mode=1777,uid=33,gid=33
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
 
     environment:
+      APACHE_SERVER_NAME: "localhost"   # or your domain
       # PHP overrides
       PHP_MEMORY_LIMIT: 256M
       PHP_UPLOAD_MAX_FILESIZE: 2000M
@@ -55,3 +56,5 @@ services:
 secrets:
   mail_pass:
     file: ./secrets/mail_pass.txt
+
+

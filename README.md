@@ -40,6 +40,7 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 
 ---
 
+
 ## Setup
 
 #### Clone the repository
@@ -67,6 +68,8 @@ Replace <override> with one of:
 #### Build
 docker compose -f docker-compose.yml -f <override> build --no-cache --pull
 
+---
+
 #### Run
 docker compose -f docker-compose.yml -f <override> up -d
 
@@ -84,6 +87,7 @@ docker compose -f docker-compose.yml -f <override> logs -f
 ```
 docker ps
 ```
+---
 
 #### Verification
 ```
@@ -104,6 +108,8 @@ HEIC / AVIF listed in ImageMagick
 hevc codecs listed in ffmpeg
 PHPMailer OK
 ```
+---
+
 #### Configuration
 
 Edit docker-compose.yml to set environment variables:
@@ -134,6 +140,8 @@ MAIL_SECURE: "tls"
 MAIL_USER: "user@example.com"
 MAIL_PASS_FILE: "/run/secrets/mail_pass"
 ```
+---
+
 ### Notes
 
 - Logs: docker logs <the name of the container>

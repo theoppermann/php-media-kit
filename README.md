@@ -146,7 +146,7 @@ MAIL_PASS_FILE: "/run/secrets/mail_pass"
 
 ### Notes
 
-- You migh want t change the container_name: webserv01 in the compose file
+- You migh want to change container_name: webserv01 in the compose file
 - Logs: docker logs <the name of the container>
 - Exec: docker exec -it <the name of the container> sh
 - Root filesystem is read-only

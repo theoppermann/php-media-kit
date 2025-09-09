@@ -66,15 +66,18 @@ Replace <override> with one of:
 - docker-compose.bookworm-debian.yml
 ```
 #### Build
+```
 docker compose -f docker-compose.yml -f <override> build --no-cache --pull
-
+```
 ---
 
 #### Run
+```
 docker compose -f docker-compose.yml -f <override> up -d
+```
 
 #### Stop
-
+```
 docker compose -f docker-compose.yml -f <override> down
 
 #### View logs

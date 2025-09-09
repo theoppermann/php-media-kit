@@ -64,7 +64,7 @@ Replace <override> with one of:
 - docker-compose.bookworm-php.yml
 
 - docker-compose.bookworm-debian.yml
-```
+
 #### Build
 ```
 docker compose -f docker-compose.yml -f <override> build --no-cache --pull
@@ -79,7 +79,7 @@ docker compose -f docker-compose.yml -f <override> up -d
 #### Stop
 ```
 docker compose -f docker-compose.yml -f <override> down
-
+```
 #### View logs
 ```
 docker logs -f <the name of the container> or

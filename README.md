@@ -39,7 +39,21 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 - Prefer the official `php:*` images or need to **pin Imagick via PECL**? → **`docker-compose.trixie-im7.yml`** or **`docker-compose.bookworm-php.yml`**
 
 ---
+### Production vs Development
 
+Configuration is controlled in **`docker-compose.yml`**.  
+By default, the stack runs in **production mode** for maximum security:
+
+**Service-level security**
+- `read_only: true` → locks the container root filesystem.  
+  ⚠️ Keep this enabled in both production **and** development, unless you hit specific issues.  
+
+**Mounts**
+- `./www` → mounted read-only (`:ro`) to protect application code.  
+- `./uploads` → persistent writable storage (must be writable by `www-data`).  
+- `./www/cache` → in-memory tmpfs mount (ephemeral, auto-cleared on restart).  
+
+👉 **For development:** change the `www` bind mount in `docker-compose.yml` to `read_only: false` so you can edit code inside the container.
 
 ## Setup
 
@@ -50,7 +64,9 @@ cd webserver01
 ```
 #### Create the mail secret
 ```
-mkdir -p secrets
+mkdir -p ./www/uploads ./www/cache ./uploads ./secrets
+sudo chown -R 33:33 ./uploads
+chmod -R 750 ./uploads
 echo "super-secret-password" > secrets/mail_pass.txt
 ```
 #### Build & run

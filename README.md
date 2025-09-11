@@ -67,7 +67,7 @@ cd webserver01
 ```
 mkdir -p ./www/uploads ./www/cache ./uploads ./secrets
 sudo chown -R 33:33 ./uploads
-chmod -R 750 ./uploads
+sudo chmod -R 750 ./uploads
 echo "super-secret-password" > secrets/mail_pass.txt
 ```
 #### Build & run

@@ -1,34 +1,42 @@
 services:
-  web:                       # Service name (DNS hostname for other services)
-    container_name: webserv01   # Fixed Docker container name (Compose-only is fine)
+  web:
+    container_name: webserv01
     build:
-      context: .             # <— Dockerfile is chosen by overridefile
+      context: .
     ports:
       - "80:8080"
     restart: unless-stopped
 
-    # DEV DEFAULT:
-    # Root filesystem is writable so mountpoints can be created automatically.
-    # ⚠️ IMPORTANT (PROD): set `read_only: true` and make code bind :ro.
-    read_only: false
+    # PROD DEFAULT:
+    # Root filesystem is read-only for maximum security.
+    # Required directories (./www/uploads, ./www/cache, ./uploads)
+    # must be created manually before first start.
+    # Switch to `read_only: false` only if you want to relax this in dev.
+    read_only: true
 
-    user: "33:33"            # run as www-data (non-root)
+    user: "33:33"
 
-    # Resource safety limits (prevent runaway processes / FDs)
     pids_limit: 200
     ulimits:
       nofile:
         soft: 4096
         hard: 8192
 
-    # Volumes: code RW in dev, uploads persistent RW
     volumes:
-      # Code (RW in dev; switch to :ro in prod)
-      - ./www:/var/www/html
-      # User uploads (persistent)
-      - ./uploads:/var/www/html/uploads
+      # Code directory:
+      # ⚠️ Default is read-only for security.
+      # Set `read_only: false` during development if you need to edit code inside the container.
+      - type: bind
+        source: ./www
+        target: /var/www/html
+        read_only: true
 
-    # Runtime tmpfs mounts (secured, no world-writable Apache dirs)
+      # Uploads (explicit bind, read-write)
+      - type: bind
+        source: ./uploads
+        target: /var/www/html/uploads
+        # read_only: false  # (default)
+
     tmpfs:
       - /tmp:mode=1777
       - /var/run/apache2:mode=0755,uid=33,gid=33
@@ -42,23 +50,20 @@ services:
       - ALL
 
     environment:
-      APACHE_SERVER_NAME: "localhost"   # or your domain
-      # PHP overrides
+      APACHE_SERVER_NAME: "localhost"
       PHP_MEMORY_LIMIT: 256M
       PHP_UPLOAD_MAX_FILESIZE: 2000M
       PHP_POST_MAX_SIZE: 2000M
       PHP_MAX_EXECUTION_TIME: 120
       OPCACHE_ENABLE: "0"
       PHP_TZ: "Europe/Copenhagen"
-
-      # Optional Apache/headers
       # TRUSTED_PROXIES: "172.20.0.5"
       # HSTS: "max-age=31536000; includeSubDomains"
       # CSP_REPORT_ONLY: "default-src 'self'; img-src 'self' data:; object-src 'none'"
       # CSP: "default-src 'self'; img-src 'self' data:; object-src 'none'"
       # APP_WRITABLE_DIRS: not needed — uploads/cache are mounted with correct permissions
 
-      # Mail config
+     # mail setup
       MAIL_HOST: "smtp.example.com"
       MAIL_PORT: "587"
       MAIL_SECURE: "tls"

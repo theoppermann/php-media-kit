@@ -63,16 +63,25 @@ By default, the stack runs in **production mode** for maximum security:
 git clone https://github.com/theoppermann/php-apache-imagick-ffmpeg.git webserver01
 cd webserver01
 ```
-#### Create the mail secret
+#### Make default dirs
 ```
 mkdir -p ./www/uploads ./www/cache ./uploads ./secrets
 sudo chown -R 33:33 ./uploads
 sudo chmod -R 750 ./uploads
+```
+#### Create the mail secret
+```
 echo "super-secret-password" > secrets/mail_pass.txt
 ```
-#### Build & run
-
-Replace <override> with one of:
+#### Build
+```
+docker compose -f docker-compose.yml -f docker-compose.trixie-debian.yml build --no-cache --pull
+```
+#### Alternative builds 
+```
+docker compose -f docker-compose.yml -f <override> build --no-cache --pull"
+```
+Replace ``` <override> ```with one of:
 
 - docker-compose.trixie-debian.yml (recommended)
 
@@ -82,10 +91,6 @@ Replace <override> with one of:
 
 - docker-compose.bookworm-debian.yml
 
-#### Build
-```
-docker compose -f docker-compose.yml -f <override> build --no-cache --pull
-```
 
 #### Run
 ```

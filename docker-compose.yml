@@ -1,18 +1,41 @@
 services:
-  web:
-    container_name: webserv01
+  web:                       # Service name (DNS hostname for other services)
+    container_name: webserv01   # Fixed Docker container name (Compose-only is fine)
     build:
-      context: .        # <— Dockerfile is chosen by overridefile
+      context: .             # <— Dockerfile is chosen by overridefile
     ports:
       - "80:8080"
-    restart: unless-stopped 
-    # Security hardening
-    read_only: true
+    restart: unless-stopped
+
+    # DEV DEFAULT:
+    # Root filesystem is writable so mountpoints can be created automatically.
+    # ⚠️ IMPORTANT (PROD): set `read_only: true` and make code bind :ro.
+    read_only: false
+
+    user: "33:33"            # run as www-data (non-root)
+
+    # Resource safety limits (prevent runaway processes / FDs)
+    pids_limit: 200
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
+
+    # Volumes: code RW in dev, uploads persistent RW
+    volumes:
+      # Code (RW in dev; switch to :ro in prod)
+      - ./www:/var/www/html
+      # User uploads (persistent)
+      - ./uploads:/var/www/html/uploads
+
+    # Runtime tmpfs mounts (secured, no world-writable Apache dirs)
     tmpfs:
       - /tmp:mode=1777
-      - /var/run/apache2:mode=1777,uid=33,gid=33
-      - /var/lock/apache2:mode=1777,uid=33,gid=33
-      - /var/log/apache2:mode=1777,uid=33,gid=33
+      - /var/run/apache2:mode=0755,uid=33,gid=33
+      - /var/lock/apache2:mode=0755,uid=33,gid=33
+      - /var/log/apache2:mode=0755,uid=33,gid=33
+      - /var/www/html/cache:mode=0755,uid=33,gid=33
+
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -29,12 +52,11 @@ services:
       PHP_TZ: "Europe/Copenhagen"
 
       # Optional Apache/headers
-      # APACHE_SERVER_NAME: "example.com"
       # TRUSTED_PROXIES: "172.20.0.5"
       # HSTS: "max-age=31536000; includeSubDomains"
       # CSP_REPORT_ONLY: "default-src 'self'; img-src 'self' data:; object-src 'none'"
       # CSP: "default-src 'self'; img-src 'self' data:; object-src 'none'"
-      # APP_WRITABLE_DIRS: "/var/www/html/uploads /var/www/html/cache"
+      # APP_WRITABLE_DIRS: not needed — uploads/cache are mounted with correct permissions
 
       # Mail config
       MAIL_HOST: "smtp.example.com"
@@ -56,5 +78,3 @@ services:
 secrets:
   mail_pass:
     file: ./secrets/mail_pass.txt
-
-

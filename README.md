@@ -39,6 +39,7 @@ Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian
 - Prefer the official `php:*` images or need to **pin Imagick via PECL**? → **`docker-compose.trixie-im7.yml`** or **`docker-compose.bookworm-php.yml`**
 
 ---
+
 ### Production vs Development
 
 Configuration is controlled in **`docker-compose.yml`**.  
@@ -49,9 +50,9 @@ By default, the stack runs in **production mode** for maximum security:
   ⚠️ Keep this enabled in both production **and** development, unless you hit specific issues.  
 
 **Mounts**
-- `./www` → mounted read-only (`:ro`) to protect application code.  
-- `./uploads` → persistent writable storage (must be writable by `www-data`).  
-- `./www/cache` → in-memory tmpfs mount (ephemeral, auto-cleared on restart).  
+- `./www` → bound to `/var/www/html` with `read_only: true` (code is protected).  
+- `./uploads` → bound to `/var/www/html/uploads` (persistent, writable by `www-data`).  
+- `/var/www/html/cache` → tmpfs mount (in-memory, auto-cleared on restart).  
 
 👉 **For development:** change the `www` bind mount in `docker-compose.yml` to `read_only: false` so you can edit code inside the container.
 

@@ -1,45 +1,53 @@
 # syntax=docker/dockerfile:1.7
 
 ############################
-# Stage 1: PHPMailer vendor
-############################
-FROM composer:2 AS deps
-WORKDIR /app
-RUN composer init --no-interaction --name=temp/temp \
- && composer require --no-interaction --no-plugins --no-scripts phpmailer/phpmailer:^6.9 \
- && composer dump-autoload --optimize
-
-############################
-# Stage 2: Runtime (Debian 12)
+# Runtime (Debian 12 / PHP 8.2 via apt)
 ############################
 FROM debian:bookworm-slim
 
-ENV DEBIAN_FRONTEND=noninteractive TZ=Europe/Copenhagen \
-    PHP_INI_SCAN_DIR="/etc/php/8.2/apache2/conf.d:/tmp/php-conf.d"
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Apache + PHP 8.2 + Imagick (IM6) + HEIC/AVIF + ffmpeg + zip
+# --- Runtime: Apache + PHP (8.2) + Imagick + HEIC/AVIF + FFmpeg + PHPMailer ---
+# NOTE: Cleanup (docs/man/locales) is appended to THIS RUN so the layer shrinks.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata curl \
     apache2 \
     php8.2 libapache2-mod-php8.2 \
     php8.2-mysql php8.2-sqlite3 php8.2-zip \
     php8.2-mbstring php8.2-xml php8.2-gd php8.2-curl \
-    php-imagick \
+    php-imagick libphp-phpmailer \
     imagemagick libheif1 libde265-0 \
     ffmpeg zip \
- && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+            /usr/share/doc/* /usr/share/info/* /usr/share/man/* \
+  && find /usr/share/locale -mindepth 1 -maxdepth 1 \
+         ! -name 'en' ! -name 'en_*' ! -name 'da' ! -name 'da_*' \
+         -exec rm -rf {} +
 
-# OPcache off
-RUN printf "opcache.enable=0\nopcache.enable_cli=0\n" \
-  > /etc/php/8.2/apache2/conf.d/zz-opcache-off.ini
+# Ensure imagick is enabled (usually auto; harmless if already enabled)
+RUN phpenmod imagick
 
-# Apache hardening + logs + port 8080
-RUN a2enmod rewrite headers deflate expires remoteip && a2dismod -f autoindex status && \
-    { echo 'ErrorLog /proc/self/fd/2'; echo 'CustomLog /proc/self/fd/1 combined'; } \
-      > /etc/apache2/conf-available/log-to-stdout.conf && a2enconf log-to-stdout && \
-    sed -ri 's/^Listen 80/Listen 8080/' /etc/apache2/ports.conf && \
-    sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:8080>#' /etc/apache2/sites-available/000-default.conf && \
-    { \
+# --- OPcache OFF by default (works for installed PHP 8.2) ---
+RUN install -d /etc/php/8.2/apache2/conf.d \
+ && printf "opcache.enable=0\nopcache.enable_cli=0\n" \
+    > /etc/php/8.2/apache2/conf.d/zz-opcache-off.ini
+
+# --- PHPMailer: autoload globally (Apache + CLI) ---
+RUN install -d /etc/php/8.2/apache2/conf.d /etc/php/8.2/cli/conf.d \
+ && printf 'auto_prepend_file=/usr/share/php/libphp-phpmailer/autoload.php\n' \
+    > /etc/php/8.2/apache2/conf.d/10-phpmailer-autoload.ini \
+ && printf 'auto_prepend_file=/usr/share/php/libphp-phpmailer/autoload.php\n' \
+    > /etc/php/8.2/cli/conf.d/10-phpmailer-autoload.ini
+
+# --- Apache hardening + logs to stdout + switch to :8080 ---
+RUN a2enmod rewrite headers deflate expires remoteip \
+ && a2dismod -f autoindex status \
+ && { echo 'ErrorLog /proc/self/fd/2'; echo 'CustomLog /proc/self/fd/1 combined'; } \
+      > /etc/apache2/conf-available/log-to-stdout.conf \
+ && a2enconf log-to-stdout \
+ && sed -ri 's/^Listen 80/Listen 8080/' /etc/apache2/ports.conf \
+ && sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:8080>#' /etc/apache2/sites-available/000-default.conf \
+ && { \
       echo "ServerTokens Prod"; \
       echo "ServerSignature Off"; \
       echo "TraceEnable Off"; \
@@ -47,23 +55,46 @@ RUN a2enmod rewrite headers deflate expires remoteip && a2dismod -f autoindex st
       echo 'Header always set X-Frame-Options "DENY"'; \
       echo 'Header always set Referrer-Policy "no-referrer-when-downgrade"'; \
       echo 'Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"'; \
-    } > /etc/apache2/conf-available/security.conf && a2enconf security
+    } > /etc/apache2/conf-available/security.conf \
+ && a2enconf security \
+ && { \
+      echo "<Directory /var/www/>"; \
+      echo "  Options -Indexes -Includes -ExecCGI"; \
+      echo "  AllowOverride All"; \
+      echo "  Require all granted"; \
+      echo "</Directory>"; \
+    } > /etc/apache2/conf-available/security-extra.conf \
+ && a2enconf security-extra
 
-# Health endpoint
+# --- Serve /files from /var/www/data and disable PHP there (baked-in policy) ---
+RUN { \
+  echo 'Alias /files/ /var/www/data/'; \
+  echo '<Directory /var/www/data>'; \
+  echo '  Options -Indexes -ExecCGI'; \
+  echo '  AllowOverride None'; \
+  echo '  Require all granted'; \
+  echo '  php_admin_flag engine off'; \
+  echo '  <FilesMatch "\\.php$">'; \
+  echo '    Require all denied'; \
+  echo '  </FilesMatch>'; \
+  echo '</Directory>'; \
+} > /etc/apache2/conf-available/files.conf \
+ && a2enconf files
+
+# --- Minimal health endpoint ---
 RUN printf "<?php http_response_code(200); echo 'OK';" > /var/www/html/health.php
 
-# PHPMailer (kun vendor ind)
-RUN mkdir -p /usr/local/lib/php-vendor
-COPY --from=deps /app/vendor /usr/local/lib/php-vendor/phpmailer
-
-# Entrypoint
+# --- Entrypoint (RO-rootfs & non-root friendly) ---
 COPY docker-php-entrypoint.sh /usr/local/bin/docker-php-entrypoint
 RUN chmod +x /usr/local/bin/docker-php-entrypoint
 
-# RO-perms + non-root
+# --- Read-only perms + non-root ---
 RUN chown -R root:root /var/www \
  && find /var/www -type d -exec chmod 755 {} \; \
  && find /var/www -type f -exec chmod 644 {} \;
+
+# --- Create writable data root for runtime files ---
+RUN install -d /var/www/data && chown -R www-data:www-data /var/www/data
 
 WORKDIR /var/www/html
 USER www-data

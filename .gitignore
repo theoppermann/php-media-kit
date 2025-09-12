@@ -22,4 +22,5 @@ tmp/               # midlertidig mappe
 # Runtime data (persist via volumes, aldrig i Git)
 # ------------------------------
 uploads/           # brugeruploads
+data/              # persistent data
 cache/             # applikations-cache

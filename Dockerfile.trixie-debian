@@ -8,6 +8,7 @@ FROM debian:trixie-slim
 ENV DEBIAN_FRONTEND=noninteractive
 
 # --- Runtime: Apache + PHP (8.4) + IM7 + HEIC/AVIF + FFmpeg + PHPMailer ---
+# NOTE: Cleanup (docs/man/locales) is appended to THIS RUN so the layer shrinks.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata curl \
     apache2 \
@@ -17,7 +18,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     php-imagick libphp-phpmailer \
     imagemagick-7.q16 libheif1 libde265-0 \
     ffmpeg zip \
- && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+            /usr/share/doc/* /usr/share/info/* /usr/share/man/* \
+  && find /usr/share/locale -mindepth 1 -maxdepth 1 \
+         ! -name 'en' ! -name 'en_*' ! -name 'da' ! -name 'da_*' \
+         -exec rm -rf {} +
 
 # Ensure imagick is enabled (usually auto; harmless if already enabled)
 RUN phpenmod imagick

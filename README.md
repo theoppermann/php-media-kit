@@ -1,36 +1,42 @@
-# PHP + Apache (Debian) — Hardened Container
+# PHP + Apache (Debian) — Hardened Docker Compose
 
-Production-ready Docker setup for PHP + Apache on Debian, with two flavors:
+Production-ready Docker setup for PHP + Apache on Debian.
 
-## Flavors
-
-### 1) Pure Debian (apt-only)
+### Debian Trixie (apt-only)
 Everything (PHP, Imagick, ImageMagick, FFmpeg) is installed from Debian’s APT repos.  
-**Pros:** one update channel (`apt`), Debian hardening, lowest maintenance.  
-**Variants:**
-- **Trixie – pure Debian (recommended):** `docker-compose.trixie-debian.yml`  
-  Debian 13 • PHP **8.4** • ImageMagick **7** • `php-imagick` **3.8.x**
-- **Bookworm – pure Debian:** `docker-compose.bookworm-debian.yml`  
-  Debian 12 • PHP **8.2** • ImageMagick **6** • `php-imagick` **3.7.x**
+**Pros:** single update channel (`apt`), Debian hardening, lowest maintenance.  
 
-### 2) Upstream PHP + PECL
-Uses official `php:*` images for PHP; Imagick is installed from **PECL**. Debian APT is still used for FFmpeg/ImageMagick.  
-**Pros:** easy to pin Imagick version and use upstream PHP features. **Note:** not “apt-only”.  
-**Variants:**
-- **Trixie – php:8.3-apache + IM7:** `docker-compose.trixie-im7.yml`  
-  Debian 13 base • PHP **8.3** (from `php:*`) • ImageMagick **7** • PECL `imagick` **3.8.0**
-- **Bookworm – php:8.3-apache:** `docker-compose.bookworm-php.yml`  
-  Debian 12 base • PHP **8.3** (from `php:*`) • ImageMagick **6** • PECL `imagick` **3.8.0**
+- `docker-compose.trixie-debian.yml`  
+  - Debian 13  
+  - PHP **8.4**  
+  - ImageMagick **7**  
+  - `php-imagick` **3.8.x`  
+  - PDO (`pdo_mysql`, `pdo_sqlite`)  
+  - Imagick with **HEIC/AVIF** support  
+  - `ffmpeg` with **HEVC/H.265**  
+  - PHPMailer bundled (vendor tree)  
+  - ZIP extension  
+  - **OPcache disabled by default**  
+  - Runs as **non-root** and supports **read-only** root filesystem  
 
-### Common features (all variants)
+---
 
-- PDO (`pdo_mysql`, `pdo_sqlite`)
-- Imagick with **HEIC/AVIF** support
-- `ffmpeg` with **HEVC/H.265**
-- PHPMailer bundled (vendor tree)
-- ZIP extension
-- **OPcache disabled by default**
-- Runs as **non-root** and supports **read-only** root filesystem
+### Alternatives
+
+- **Debian Bookworm (apt-only):**  
+  `docker-compose.bookworm-debian.yml`  
+  Debian 12 • PHP **8.2** • ImageMagick **6** • `php-imagick` **3.7.x`  
+  → Choose this if you must stay on Debian 12.  
+
+- **Debian Trixie + Upstream PHP/PECL:**  
+  `docker-compose.trixie-im7.yml`  
+  Debian 13 • PHP **8.3** (`php:*` image) • ImageMagick **7** • PECL `imagick` **3.8.0`  
+  → Use this if you need official `php:*` images or want to pin Imagick via PECL.  
+
+- **Debian Bookworm + Upstream PHP/PECL:**  
+  `docker-compose.bookworm-php.yml`  
+  Debian 12 • PHP **8.3** (`php:*` image) • ImageMagick **6** • PECL `imagick` **3.8.0`  
+  → Legacy option for Debian 12 with upstream PHP.  
 
 ### Quick choose
 
@@ -168,7 +174,7 @@ MAIL_PASS_FILE: "/run/secrets/mail_pass"
 
 ### Notes
 
-- You migh want to change container_name: webserv01 in the compose file
+- You migh want to change or remove container_name: webserv01 in the compose file
 - Logs: docker logs <the name of the container>
 - Exec: docker exec -it <the name of the container> sh
 - Root filesystem is read-only

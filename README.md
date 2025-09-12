@@ -100,12 +100,12 @@ Replace ``` <override> ```with one of:
 
 #### Run
 ```
-docker compose -f docker-compose.yml -f <override> up -d
+docker compose up -d
 ```
 
 #### Stop
 ```
-docker compose -f docker-compose.yml -f <override> down
+docker compose down
 ```
 #### View logs
 ```

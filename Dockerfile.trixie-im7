@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ############################
-# Stage 1: PHPMailer vendor
+# Stage 1: PHPMailer vendor (Composer)
 ############################
 FROM composer:2 AS deps
 WORKDIR /app
@@ -10,68 +10,98 @@ RUN composer init --no-interaction --name=temp/temp \
  && composer dump-autoload --optimize
 
 ############################
-# Stage 2: Runtime (Debian 13 / IM7)
+# Stage 2: Runtime (Debian 13 / PHP 8.3 / IM7)
 ############################
 FROM php:8.3-apache-trixie
 
-ENV DEBIAN_FRONTEND=noninteractive TZ=Europe/Copenhagen \
-    PHP_INI_SCAN_DIR="/usr/local/etc/php/conf.d:/tmp/php-conf.d" \
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Europe/Copenhagen \
     CFLAGS="-Wno-deprecated-declarations" \
     CPPFLAGS="-Wno-deprecated-declarations"
 
-# ---- Runtime libs (IM7 + HEIC/AVIF, ffmpeg m. H.265, ZIP) ----
+# --- Runtime libs (IM7 + HEIC/AVIF + ffmpeg + zip runtime) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates tzdata curl \
       imagemagick-7.q16 libmagickwand-7.q16-10 libheif1 libde265-0 \
       ffmpeg zip \
       libsqlite3-0 libzip5 zlib1g \
- && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/*
 
-# ---- PHP extensions + PECL imagick 3.8.0 (mod IM7) ----
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-7.q16-dev \
- && docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_sqlite zip \
- && pecl install imagick-3.8.0 \
- && docker-php-ext-enable imagick \
- && apt-get purge -y $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-7.q16-dev \
- && apt-get autoremove -y \
- && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# --- PHP extensions + PECL imagick 3.8.0 (linking against IM7) ---
+RUN set -eux; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+      $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-7.q16-dev; \
+  docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_sqlite zip; \
+  pecl install imagick-3.8.0; \
+  docker-php-ext-enable imagick; \
+  apt-get purge -y --auto-remove \
+      $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-7.q16-dev; \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# ---- OPcache disabled by default ----
+# --- OPcache disabled by default (parity with other stacks) ---
 RUN printf "opcache.enable=0\nopcache.enable_cli=0\n" \
   > /usr/local/etc/php/conf.d/zz-opcache-off.ini
 
-# ---- Apache hardening + logs + port 8080 ----
-RUN a2enmod rewrite headers deflate expires remoteip && a2dismod -f autoindex status && \
-    { echo 'ErrorLog /proc/self/fd/2'; echo 'CustomLog /proc/self/fd/1 combined'; } \
-      > /etc/apache2/conf-available/log-to-stdout.conf && a2enconf log-to-stdout && \
-    sed -ri 's/^Listen 80/Listen 8080/' /etc/apache2/ports.conf && \
-    sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:8080>#' /etc/apache2/sites-available/000-default.conf && \
-    { \
-      echo "ServerTokens Prod"; \
-      echo "ServerSignature Off"; \
-      echo "TraceEnable Off"; \
+# --- PHPMailer via Composer vendor (global autoload) ---
+RUN install -d /usr/local/lib/php-vendor
+COPY --from=deps /app/vendor /usr/local/lib/php-vendor
+RUN printf 'auto_prepend_file=/usr/local/lib/php-vendor/autoload.php\n' \
+  > /usr/local/etc/php/conf.d/10-phpmailer-autoload.ini
+
+# --- Apache hardening + logs → stdout + switch to :8080 ---
+RUN a2enmod rewrite headers deflate expires remoteip \
+ && a2dismod -f autoindex status \
+ && { echo 'ErrorLog /proc/self/fd/2'; echo 'CustomLog /proc/self/fd/1 combined'; } \
+      > /etc/apache2/conf-available/log-to-stdout.conf \
+ && a2enconf log-to-stdout \
+ && sed -ri 's/^Listen 80/Listen 8080/' /etc/apache2/ports.conf \
+ && sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:8080>#' /etc/apache2/sites-available/000-default.conf \
+ && { \
+      echo 'ServerTokens Prod'; \
+      echo 'ServerSignature Off'; \
+      echo 'TraceEnable Off'; \
       echo 'Header always set X-Content-Type-Options "nosniff"'; \
       echo 'Header always set X-Frame-Options "DENY"'; \
       echo 'Header always set Referrer-Policy "no-referrer-when-downgrade"'; \
       echo 'Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"'; \
-    } > /etc/apache2/conf-available/security.conf && a2enconf security
+    } > /etc/apache2/conf-available/security.conf \
+ && a2enconf security \
+ && { \
+      echo '<Directory /var/www/>'; \
+      echo '  Options -Indexes -Includes -ExecCGI'; \
+      echo '  AllowOverride All'; \
+      echo '  Require all granted'; \
+      echo '</Directory>'; \
+    } > /etc/apache2/conf-available/security-extra.conf \
+ && a2enconf security-extra \
+ && { \
+      echo 'Alias /files/ /var/www/data/'; \
+      echo '<Directory /var/www/data>'; \
+      echo '  Options -Indexes -ExecCGI'; \
+      echo '  AllowOverride None'; \
+      echo '  Require all granted'; \
+      echo '  php_admin_flag engine off'; \
+      echo '  <FilesMatch "\\.php$">'; \
+      echo '    Require all denied'; \
+      echo '  </FilesMatch>'; \
+      echo '</Directory>'; \
+    } > /etc/apache2/conf-available/files.conf \
+ && a2enconf files \
+ && apache2ctl -t
 
-# ---- Health endpoint ----
+# --- Minimal health endpoint ---
 RUN printf "<?php http_response_code(200); echo 'OK';" > /var/www/html/health.php
 
-# ---- Bundle PHPMailer (uden composer i runtime) ----
-RUN mkdir -p /usr/local/lib/php-vendor
-COPY --from=deps /app/vendor /usr/local/lib/php-vendor/phpmailer
-
-# ---- Entrypoint ----
+# --- Entrypoint (keep if you have custom logic) ---
 COPY docker-php-entrypoint.sh /usr/local/bin/docker-php-entrypoint
 RUN chmod +x /usr/local/bin/docker-php-entrypoint
 
-# ---- Code immutability + non-root ----
+# --- Read-only perms + non-root + data dir for static files ---
 RUN chown -R root:root /var/www \
  && find /var/www -type d -exec chmod 755 {} \; \
- && find /var/www -type f -exec chmod 644 {} \;
+ && find /var/www -type f -exec chmod 644 {} \; \
+ && install -d /var/www/data && chown -R www-data:www-data /var/www/data
 
 WORKDIR /var/www/html
 USER www-data

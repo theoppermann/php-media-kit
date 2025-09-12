@@ -1,31 +1,21 @@
 # syntax=docker/dockerfile:1.7
 
 ############################
-# Stage 1: PHPMailer vendor
-############################
-FROM composer:2 AS deps
-WORKDIR /app
-RUN composer init --no-interaction --name=temp/temp \
- && composer require --no-interaction --no-plugins --no-scripts phpmailer/phpmailer:^6.9 \
- && composer dump-autoload --optimize
-
-############################
-# Stage 2: Runtime (Debian 13 / PHP 8.4 via apt)
+# Runtime (Debian 13 / PHP 8.4 via apt)
 ############################
 FROM debian:trixie-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=Europe/Copenhagen
-# NOTE: PHP_INI_SCAN_DIR is set dynamically in the entrypoint to match installed PHP.
 
-# --- Runtime: Apache + PHP (8.4 meta packages) + IM7 + HEIC/AVIF + FFmpeg ---
+# --- Runtime: Apache + PHP (8.4) + IM7 + HEIC/AVIF + FFmpeg + PHPMailer ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata curl \
     apache2 \
     php libapache2-mod-php \
     php-mysql php-sqlite3 php-zip \
     php-mbstring php-xml php-gd php-curl \
-    php-imagick \
+    php-imagick libphp-phpmailer \
     imagemagick-7.q16 libheif1 libde265-0 \
     ffmpeg zip \
  && rm -rf /var/lib/apt/lists/*
@@ -34,10 +24,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN phpenmod imagick
 
 # --- OPcache OFF by default (works for any installed PHP 8.x) ---
-RUN PHP_VERS="$(php -r 'printf("%d.%d", PHP_MAJOR_VERSION, PHP_MINOR_VERSION);')" \
+RUN PHP_VERS="$(php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" \
  && install -d "/etc/php/${PHP_VERS}/apache2/conf.d" \
  && printf "opcache.enable=0\nopcache.enable_cli=0\n" \
     > "/etc/php/${PHP_VERS}/apache2/conf.d/zz-opcache-off.ini"
+
+# --- PHPMailer: autoload globally (Apache + CLI) ---
+RUN PHP_VERS="$(php -r 'echo PHP_MAJOR_VERSION, ".", PHP_MINOR_VERSION;')" \
+ && install -d "/etc/php/${PHP_VERS}/apache2/conf.d" "/etc/php/${PHP_VERS}/cli/conf.d" \
+ && printf 'auto_prepend_file=/usr/share/php/libphp-phpmailer/autoload.php\n' \
+    > "/etc/php/${PHP_VERS}/apache2/conf.d/10-phpmailer-autoload.ini" \
+ && printf 'auto_prepend_file=/usr/share/php/libphp-phpmailer/autoload.php\n' \
+    > "/etc/php/${PHP_VERS}/cli/conf.d/10-phpmailer-autoload.ini"
 
 # --- Apache hardening + logs to stdout + switch to :8080 ---
 RUN a2enmod rewrite headers deflate expires remoteip \
@@ -68,10 +66,6 @@ RUN a2enmod rewrite headers deflate expires remoteip \
 
 # --- Minimal health endpoint ---
 RUN printf "<?php http_response_code(200); echo 'OK';" > /var/www/html/health.php
-
-# --- Bundle PHPMailer vendor (no Composer in runtime) ---
-RUN mkdir -p /usr/local/lib/php-vendor
-COPY --from=deps /app/vendor /usr/local/lib/php-vendor/phpmailer
 
 # --- Entrypoint (RO-rootfs & non-root friendly) ---
 COPY docker-php-entrypoint.sh /usr/local/bin/docker-php-entrypoint

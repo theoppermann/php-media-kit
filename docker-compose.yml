@@ -37,6 +37,13 @@ services:
         target: /var/www/html/uploads
         # read_only: false  # (default)
 
+      # Apache overide file 
+      # - type: bind
+      #    source: ./apache-conf/files.override.conf
+      #    target: /etc/apache2/conf-enabled/99-files-override.conf
+      #     read_only: true  
+
+
     tmpfs:
       - /tmp:mode=1777
       - /var/run/apache2:mode=0755,uid=33,gid=33
@@ -51,6 +58,7 @@ services:
 
     environment:
       APACHE_SERVER_NAME: "localhost"
+      TZ: "Europe/Copenhagen"
       PHP_MEMORY_LIMIT: 256M
       PHP_UPLOAD_MAX_FILESIZE: 2000M
       PHP_POST_MAX_SIZE: 2000M

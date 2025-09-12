@@ -46,22 +46,6 @@ Everything (PHP, Imagick, ImageMagick, FFmpeg) is installed from Debian’s APT 
 
 ---
 
-### Production vs Development
-
-Configuration is controlled in **`docker-compose.yml`**.  
-By default, the stack runs in **production mode** for maximum security:
-
-**Service-level security**
-- `read_only: true` → locks the container root filesystem.  
-  ⚠️ Keep this enabled in both production **and** development, unless you hit specific issues.  
-
-**Mounts**
-- `./www` → bound to `/var/www/html` with `read_only: true` (code is protected).  
-- `./uploads` → bound to `/var/www/html/uploads` (persistent, writable by `www-data`).  
-- `/var/www/html/cache` → tmpfs mount (in-memory, auto-cleared on restart).  
-
-👉 **For development:** change the `www` bind mount in `docker-compose.yml` to `read_only: false` so you can edit code inside the container.
-
 ## Setup
 
 #### Clone the repository (replace `webserver01` with your project folder name)
@@ -128,6 +112,7 @@ and open ```http://ipaddress``` in a webbrowser
 ---
 
 #### Configuration
+- DEV (unsafe) mode read [Disable readonly](notes/dev.md)
 - PHP Modifiers in the compose file see [Configurations](notes/conf.md)
 - How to add HTTPS see [Traefik](notes/traefik.md) or [Traefik Legacy](notes/traefik_legacy.md)
 

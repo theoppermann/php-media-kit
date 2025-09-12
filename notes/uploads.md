@@ -1,4 +1,25 @@
-### ⚠️ Security note:
+### Optional: Framework Uploads (/uploads)
+
+By default this stack uses /data for safe, public media (served at /files/, with PHP disabled).
+Some frameworks and legacy apps expect a writable folder inside the web root at /var/www/html/uploads.
+
+If your app requires this, enable it as follows:
+- Create host directory
+```
+mkdir -p ./uploads
+sudo chown -R 33:33 ./uploads
+sudo chmod -R 750 ./uploads
+```
+- Add to your docker-compose.yml:
+```
+  services:
+  web:
+    volumes:
+      - type: bind
+        source: ./uploads
+        target: /var/www/html/uploads
+```
+#### ⚠️ Security note:
 
 By default, files in /uploads can be executed as PHP if uploaded.
 If your framework only stores static files there (images, documents), you should harden it by disabling PHP execution:

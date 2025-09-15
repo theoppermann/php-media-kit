@@ -22,7 +22,7 @@ Mounts (defaults)
 
 - ./secrets → mounted as files (e.g., mail password).
 
-- Uploads: Disabled by default. If your framework requires /var/www/html/uploads, see the short guide: notes/uploads.md
+- Uploads: Disabled by default. If your framework requires /var/www/html/uploads, see the short guide: [Enable uploads dir](notes/uploads.md)
 
 ### For most dev workflows you do not need this override—edit on the host, refresh the browser, done.
 Optional dev override (only if in-container tools must write to ./www)

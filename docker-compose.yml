@@ -9,8 +9,6 @@ services:
 
     # PROD DEFAULT:
     # Root filesystem is read-only for maximum security.
-    # Required directories (./www/uploads, ./www/cache, ./uploads)
-    # must be created manually before first start.
     # Switch to `read_only: false` only if you want to relax this in dev.
     read_only: true
 
@@ -32,10 +30,17 @@ services:
         read_only: true
 
       # Uploads (explicit bind, read-write)
+     # - type: bind
+     #   source: ./uploads
+     #   target: /var/www/html/uploads
+     #   # read_only: false  # (default)
+        
+      # data (explicit bind, read-write)
       - type: bind
-        source: ./uploads
-        target: /var/www/html/uploads
+        source: ./data
+        target: /var/www/html/data
         # read_only: false  # (default)
+
 
       # Apache overide file 
       # - type: bind

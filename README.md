@@ -39,7 +39,7 @@ cd webserver01
 ```
 #### Make default dirs (See [uploads.md](notes/uploads.md) for legacy /uploads setup.)
 ```
-mkdir -p ./www/cache ./data ./secrets
+mkdir -p ./www/cache ./data ./secrets ./www/data 
 sudo chown -R 33:33 ./data
 sudo chmod -R 750 ./data
 ```

@@ -15,6 +15,8 @@ mkdir -p "$APACHE_RUN_DIR" /var/run/apache2 /var/lock/apache2
 # PHP overrides (write only to /tmp)
 mkdir -p /tmp/php-conf.d
 : > /tmp/php-conf.d/zz-runtime.ini
+
+# --- Eksisterende nøgler ---
 [ -n "${PHP_MEMORY_LIMIT:-}" ]        && printf 'memory_limit=%s\n'             "$PHP_MEMORY_LIMIT"        >> /tmp/php-conf.d/zz-runtime.ini
 [ -n "${PHP_UPLOAD_MAX_FILESIZE:-}" ] && printf 'upload_max_filesize=%s\n'      "$PHP_UPLOAD_MAX_FILESIZE" >> /tmp/php-conf.d/zz-runtime.ini
 [ -n "${PHP_POST_MAX_SIZE:-}" ]       && printf 'post_max_size=%s\n'            "$PHP_POST_MAX_SIZE"       >> /tmp/php-conf.d/zz-runtime.ini
@@ -22,6 +24,18 @@ mkdir -p /tmp/php-conf.d
 [ -n "${PHP_TZ:-}" ]                  && printf 'date.timezone=%s\n'            "$PHP_TZ"                  >> /tmp/php-conf.d/zz-runtime.ini
 [ -n "${OPCACHE_ENABLE:-}" ]          && printf 'opcache.enable=%s\n'           "$OPCACHE_ENABLE"          >> /tmp/php-conf.d/zz-runtime.ini
 [ -n "${OPCACHE_ENABLE_CLI:-}" ]      && printf 'opcache.enable_cli=%s\n'       "$OPCACHE_ENABLE_CLI"      >> /tmp/php-conf.d/zz-runtime.ini
+
+# --- NYT: upload-/formular-relaterede nøgler ---
+# Antal filer pr. request
+[ -n "${PHP_MAX_FILE_UPLOADS:-}" ]    && printf 'max_file_uploads=%s\n'         "$PHP_MAX_FILE_UPLOADS"    >> /tmp/php-conf.d/zz-runtime.ini
+# Mange formularfelter (checkboxes, arrays, …)
+[ -n "${PHP_MAX_INPUT_VARS:-}" ]      && printf 'max_input_vars=%s\n'           "$PHP_MAX_INPUT_VARS"      >> /tmp/php-conf.d/zz-runtime.ini
+
+# Kun på PHP >= 8.4: samlet antal multipart-dele (filer + felter)
+PHP_ID="$(php -r 'echo PHP_VERSION_ID;')"   # ex: 80400 for 8.4.0
+if [ "$PHP_ID" -ge 80400 ] && [ -n "${PHP_MAX_MULTIPART_BODY_PARTS:-}" ]; then
+  printf 'max_multipart_body_parts=%s\n'    "$PHP_MAX_MULTIPART_BODY_PARTS"     >> /tmp/php-conf.d/zz-runtime.ini
+fi
 
 # Sessions to /tmp (Debian default path is RO)
 mkdir -p /tmp/php-sessions

@@ -96,9 +96,11 @@ and open ```http://ipaddress``` in a webbrowser remember to add ports if you use
 ---
 
 #### Configuration
-- DEV (unsafe) mode read [Disable readonly](notes/dev.md)
-- PHP Modifiers in the compose file see [Configurations](notes/conf.md)
-- How to add HTTPS see [Traefik](notes/traefik.md) or [Traefik Legacy](notes/traefik_legacy.md)
+- **DEV (unsafe) mode** - read [Disable readonly](notes/dev.md)
+- **PHP Modifiers** - in the compose file see [Configurations](notes/conf.md)
+- **Apache Overrides** – The container has a pre-baked include that loads any `.conf` files you mount into `./conf/apache-conf/`.  
+  See [Custom Apache settings](notes/override.md) for details and examples.
+- How to add **HTTPS** - see [Traefik](notes/traefik.md) or [Traefik Legacy](notes/traefik_legacy.md)
 
 ---
 

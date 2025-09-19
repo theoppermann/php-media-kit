@@ -66,6 +66,9 @@ services:
       TZ: "Europe/Copenhagen"
       PHP_MEMORY_LIMIT: 256M
       PHP_UPLOAD_MAX_FILESIZE: 2000M
+      PHP_MAX_FILE_UPLOADS: "1000"
+      PHP_MAX_INPUT_VARS: "50000"
+      PHP_MAX_MULTIPART_BODY_PARTS: "5000"   # only used by PHP ≥ 8.4
       PHP_POST_MAX_SIZE: 2000M
       PHP_MAX_EXECUTION_TIME: 120
       OPCACHE_ENABLE: "0"

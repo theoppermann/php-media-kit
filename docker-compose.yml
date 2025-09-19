@@ -41,13 +41,11 @@ services:
         target: /var/www/html/data
         # read_only: false  # (default)
 
-
-      # Apache overide file 
-      # - type: bind
-      #    source: ./apache-conf/files.override.conf
-      #    target: /etc/apache2/conf-enabled/99-files-override.conf
-      #     read_only: true  
-
+     # bake in conf
+      - type: bind
+        source: ./conf/apache-conf
+        target: /opt/apache-extra
+        read_only: true
 
     tmpfs:
       - /tmp:mode=1777

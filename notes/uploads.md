@@ -19,7 +19,7 @@ sudo chmod -R 750 ./uploads
         source: ./uploads
         target: /var/www/html/uploads
 ```
-#### ⚠️ Security note:
+#### Security note:
 
 By default, files in /uploads can be executed as PHP if uploaded.
 If your framework only stores static files there (images, documents), you should harden it by disabling PHP execution:
@@ -36,7 +36,7 @@ apache-conf/uploads.override.conf
 </Directory>
 ```
 
-🔒 Recommendation:
+Recommendation:
 Use /data whenever possible.
 Only enable /uploads if your framework really requires it.
 

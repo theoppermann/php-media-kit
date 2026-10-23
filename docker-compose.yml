@@ -3,6 +3,7 @@ services:
     container_name: webserv01
     build:
       context: .
+      dockerfile: Dockerfile.trixie-debian
     ports:
       - "80:8080"
     restart: unless-stopped

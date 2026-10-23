@@ -3,10 +3,14 @@
 This stack supports multiple Debian + PHP + Imagick combinations.  
 Pick the variant that matches your environment:
 
+`docker-compose.yml` selects the Debian Trixie apt build by default. Add one of
+the variant Compose files below to select a different Dockerfile, and use the
+same files for every Compose command.
+
 - **Debian Trixie (apt-only):**  
   `docker-compose.trixie-debian.yml`  
   - Debian 13 • PHP **8.4** (from Debian’s repos)  
-  - ImageMagick **7** + `php-imagick` **3.7.x** (apt package)  
+  - ImageMagick **7** + `php-imagick` **3.8.x** (apt package)
   - Recommended: simplest setup, no PECL build step, fully managed by apt.  
 
 - **Debian Bookworm (apt-only):**  
@@ -17,7 +21,7 @@ Pick the variant that matches your environment:
 
 - **Debian Trixie + official PHP (PECL imagick):**  
   `docker-compose.trixie-im7.yml`  
-  - Debian 13 • PHP **8.3/8.4** (from official `php:*` images)  
+  - Debian 13 • PHP **8.3** (from the official `php:8.3-apache-trixie` image)
   - ImageMagick **7** + PECL `imagick` **3.8.0** (built during image build)  
   - Use this if you prefer upstream PHP releases or need imagick pinned via PECL.  
 

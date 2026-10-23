@@ -2,9 +2,9 @@
 set -e
 umask 027
 
-# Detect PHP X.Y and set writable INI scan dir
-PHP_VERS="$(php -r 'printf("%d.%d", PHP_MAJOR_VERSION, PHP_MINOR_VERSION);')"
-export PHP_INI_SCAN_DIR="/etc/php/${PHP_VERS}/apache2/conf.d:/tmp/php-conf.d"
+# Keep the build's compiled INI scan dir (Debian or upstream PHP), then load
+# writable runtime overrides. An empty path component means the compiled dir.
+export PHP_INI_SCAN_DIR=:/tmp/php-conf.d
 
 # Apache runtime on tmpfs (RO-friendly)
 export APACHE_RUN_DIR=/tmp/apache2

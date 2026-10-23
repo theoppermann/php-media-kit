@@ -4,8 +4,19 @@
 
   - IncludeOptional /opt/apache-extra/*.conf
 
-All .conf files you place in ./conf/apache-conf/ will automatically be loaded when Apache starts.
+With the stock virtual host, all .conf files you place in ./conf/apache-conf/ are loaded when Apache starts.
 This allows you to add or override configuration without touching the base image.
+If your project replaces `/etc/apache2/sites-enabled/000-default.conf`, you can
+keep its settings directly in the replacement virtual host. To load additional
+snippets, include selected files there, for example
+`IncludeOptional /opt/apache-extra/50-uploads.conf`.
+
+Use `IncludeOptional /opt/apache-extra/*.conf` inside a `<VirtualHost>` only when
+the matched files contain configuration snippets valid in that context. If the
+complete replacement virtual host is itself stored in `./conf/apache-conf/`,
+that wildcard would include it too, causing an invalid nested virtual host.
+Include selected snippets instead, or keep complete virtual-host files outside
+the wildcard's directory.
 
 ### How it works
 

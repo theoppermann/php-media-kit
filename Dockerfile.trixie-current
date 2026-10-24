@@ -1,0 +1,313 @@
+# syntax=docker/dockerfile:1.7
+
+# Official stable tags deliberately float. Refresh them with --pull and rerun
+# the source/package installation steps with --no-cache for a new release build.
+FROM python:3-slim-trixie AS python-runtime
+
+# Carry Python's Debian runtime dependencies along with its /usr/local prefix.
+# This uses the same ldd/dpkg approach as the official Python image; no system
+# libraries or virtual environments are copied between distributions.
+RUN set -eux; \
+    find /usr/local -type f -executable -not -name '*tkinter*' -exec ldd '{}' ';' \
+      | awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); printf "*%s\n", so }' \
+      | sort -u \
+      | xargs -r dpkg-query --search \
+      | awk 'sub(":$", "", $1) { print $1 }' \
+      | sort -u > /tmp/python-runtime-packages.txt; \
+    test -s /tmp/python-runtime-packages.txt
+
+FROM composer:2 AS deps
+WORKDIR /app
+RUN composer init --no-interaction --name=temp/temp \
+ && composer require --no-interaction --no-plugins --no-scripts phpmailer/phpmailer \
+ && composer dump-autoload --optimize
+
+FROM php:apache-trixie AS php-base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Europe/Copenhagen
+
+FROM php-base AS media-builder
+
+COPY --from=python-runtime /tmp/python-runtime-packages.txt /tmp/python-runtime-packages.txt
+COPY --from=python-runtime /usr/local/ /usr/local/
+
+# Keep dependency installation in its own cache layer. Intel oneVPL is supplied
+# by Debian only on amd64; the other architectures retain software codecs and
+# the acceleration interfaces available on their platform.
+RUN <<'DEPENDENCIES'
+set -eux
+vpl_packages=''
+if [ "$(dpkg --print-architecture)" = amd64 ]; then
+    vpl_packages=libvpl-dev
+fi
+apt-get update
+apt-get install -y --no-install-recommends \
+    ca-certificates tzdata curl zip fonts-dejavu-core ghostscript \
+    imagemagick-7-common \
+    libheif-plugin-libde265 libheif-plugin-x265 \
+    libheif-plugin-aomdec libheif-plugin-aomenc libheif-plugin-dav1d \
+    $(cat /tmp/python-runtime-packages.txt) \
+    $PHPIZE_DEPS build-essential autoconf automake libtool pkg-config \
+    nasm yasm xz-utils gnupg \
+    libsqlite3-dev libzip-dev \
+    libaom-dev libass-dev libdav1d-dev libgnutls28-dev \
+    libbluray-dev librubberband-dev librist-dev libsrt-gnutls-dev libssh-dev \
+    libsvtav1enc-dev libdrm-dev libva-dev libvdpau-dev $vpl_packages \
+    libfontconfig1-dev libfreetype-dev libfribidi-dev libharfbuzz-dev \
+    libmp3lame-dev libopenjp2-7-dev libopus-dev libsoxr-dev libspeex-dev \
+    libtheora-dev libtwolame-dev libvorbis-dev libvpx-dev \
+    libx264-dev libx265-dev libxvidcore-dev libzimg-dev \
+    libheif-dev libde265-dev libjpeg62-turbo-dev libpng-dev libtiff-dev \
+    libwebp-dev libjxl-dev libraw-dev librsvg2-dev libxml2-dev \
+    liblcms2-dev libfftw3-dev liblqr-1-0-dev libbz2-dev liblzma-dev \
+    libzstd-dev libdjvulibre-dev libwmf-dev libopenexr-dev libgs-dev \
+    libexif-dev libpango1.0-dev zlib1g-dev
+ldconfig
+python3 -c 'import bz2, ctypes, dbm.gnu, decimal, lzma, sqlite3, ssl, zlib'
+rm -rf /var/lib/apt/lists/*
+DEPENDENCIES
+
+# Resolve stable source releases once per fresh build, independently of compile
+# flags. FFmpeg's current release is signed; the ImageMagick asset has a digest.
+RUN <<'SOURCES'
+set -eux
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import re
+import shutil
+import urllib.request
+
+def response(url):
+    request = urllib.request.Request(url, headers={"User-Agent": "php-media-kit-build"})
+    return urllib.request.urlopen(request, timeout=120)
+
+def download(url, destination):
+    with response(url) as source, open(destination, "wb") as output:
+        shutil.copyfileobj(source, output)
+
+with response("https://ffmpeg.org/download.html") as source:
+    html = source.read().decode("utf-8")
+match = re.search(r'https://ffmpeg\.org/releases/ffmpeg-([0-9]+(?:\.[0-9]+)+)\.tar\.xz', html)
+if match is None:
+    raise RuntimeError("The official FFmpeg page did not identify a stable release archive")
+ffmpeg_version = match.group(1)
+download(match.group(0), "/tmp/ffmpeg.tar.xz")
+download(match.group(0) + ".asc", "/tmp/ffmpeg.tar.xz.asc")
+
+with response("https://api.github.com/repos/ImageMagick/ImageMagick/releases/latest") as source:
+    release = json.load(source)
+tag = release["tag_name"]
+if release["draft"] or release["prerelease"] or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+-[0-9]+", tag):
+    raise RuntimeError("ImageMagick latest release is not a stable version")
+asset_name = f"ImageMagick-{tag}.tar.xz"
+asset = next(item for item in release["assets"] if item["name"] == asset_name)
+expected_digest = asset.get("digest", "")
+if not re.fullmatch(r"sha256:[0-9a-f]{64}", expected_digest):
+    raise RuntimeError("The ImageMagick release archive has no SHA-256 digest")
+download(asset["browser_download_url"], "/tmp/imagemagick.tar.xz")
+with open("/tmp/imagemagick.tar.xz", "rb") as archive:
+    actual_digest = hashlib.file_digest(archive, "sha256").hexdigest()
+if actual_digest != expected_digest.removeprefix("sha256:"):
+    raise RuntimeError("ImageMagick release archive checksum mismatch")
+Path("/tmp/upstream-source-versions").write_text(f"FFmpeg {ffmpeg_version}\nImageMagick {tag}\n")
+print(Path("/tmp/upstream-source-versions").read_text(), end="", flush=True)
+PY
+
+# Verify FFmpeg using the release key published on its official download page.
+export GNUPGHOME=/tmp/ffmpeg-gnupg
+install -d -m 700 "$GNUPGHOME"
+curl -fsSL --retry 3 https://ffmpeg.org/ffmpeg-devel.asc -o /tmp/ffmpeg-devel.asc
+gpg --batch --import /tmp/ffmpeg-devel.asc
+gpg --batch --list-keys --with-colons \
+    | grep -q 'FCF986EA15E6E293A5644F10B4322F04D67658D8'
+gpg --batch --verify /tmp/ffmpeg.tar.xz.asc /tmp/ffmpeg.tar.xz
+
+install -d /usr/src/ffmpeg /usr/src/imagemagick
+tar -xJf /tmp/ffmpeg.tar.xz -C /usr/src/ffmpeg --strip-components=1
+tar -xJf /tmp/imagemagick.tar.xz -C /usr/src/imagemagick --strip-components=1
+
+rm -rf /tmp/ffmpeg.tar.xz /tmp/ffmpeg.tar.xz.asc /tmp/ffmpeg-devel.asc \
+    /tmp/imagemagick.tar.xz /tmp/ffmpeg-gnupg
+SOURCES
+
+# Changing build flags or parallelism reuses the dependency/source layers.
+ARG BUILD_JOBS=2
+ENV CFLAGS="-O2 -fstack-protector-strong -Wno-deprecated-declarations" \
+    CPPFLAGS="-Wno-deprecated-declarations"
+
+RUN <<'FFMPEG'
+set -eux
+vpl_option=--disable-libvpl
+if [ "$(dpkg --print-architecture)" = amd64 ]; then
+    vpl_option=--enable-libvpl
+fi
+cd /usr/src/ffmpeg
+./configure \
+    --prefix=/usr/local \
+    --disable-debug --disable-doc --disable-static --enable-shared \
+    --enable-gpl --enable-gnutls \
+    --enable-libaom --enable-libass --enable-libdav1d \
+    --enable-libbluray --enable-librubberband --enable-librist --enable-libsrt --enable-libssh \
+    --enable-libsvtav1 --enable-libjxl "$vpl_option" --enable-vaapi --enable-vdpau \
+    --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libharfbuzz \
+    --enable-libmp3lame --enable-libopenjpeg --enable-libopus --enable-libsoxr \
+    --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvorbis \
+    --enable-libvpx --enable-libwebp --enable-libx264 --enable-libx265 \
+    --enable-libxml2 --enable-libxvid --enable-libzimg
+make -j "$BUILD_JOBS"
+make install
+ldconfig
+FFMPEG
+
+# ImageMagick's loadable format modules require the libltdl development headers.
+RUN apt-get update && apt-get install -y --no-install-recommends libltdl-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN <<'IMAGEMAGICK'
+set -eux
+# Retain Debian's existing policy while installing current source-built tools.
+cp /etc/ImageMagick-7/policy.xml /tmp/imagemagick-policy.xml
+cd /usr/src/imagemagick
+./configure \
+    --prefix=/usr/local --sysconfdir=/etc \
+    --with-quantum-depth=16 --disable-hdri --with-modules --with-perl=no \
+    --without-x --with-heic=yes --with-jpeg=yes --with-png=yes --with-tiff=yes \
+    --with-webp=yes --with-openjp2=yes --with-fontconfig=yes
+make -j "$BUILD_JOBS"
+make install
+cp /tmp/imagemagick-policy.xml /etc/ImageMagick-7/policy.xml
+ldconfig
+IMAGEMAGICK
+
+RUN set -eux; \
+    docker-php-ext-install -j"$BUILD_JOBS" pdo_mysql pdo_sqlite zip; \
+    pecl config-set preferred_state stable; \
+    pecl install imagick; \
+    docker-php-ext-enable imagick; \
+    ldconfig
+
+# Derive native runtime packages only after Python, PHP and both media tools
+# are installed. HEIF plugins are handled explicitly in the final stage because
+# they are loaded with dlopen rather than listed by ldd.
+RUN <<'RUNTIME_PACKAGES'
+set -eux
+find /usr/local -type f -executable -not -name '*tkinter*' -exec ldd '{}' ';' \
+    > /tmp/native-library-links.txt 2>/dev/null
+if grep -q '=> not found' /tmp/native-library-links.txt; then
+    cat /tmp/native-library-links.txt >&2
+    exit 1
+fi
+awk '/=>/ { so = $(NF-1); if (index(so, "/usr/local/") == 1) { next }; gsub("^/(usr/)?", "", so); printf "*%s\n", so }' \
+    /tmp/native-library-links.txt \
+    | sort -u \
+    | xargs -r dpkg-query --search \
+    | awk 'sub(":$", "", $1) { print $1 }' \
+    | sort -u > /tmp/media-runtime-packages.txt
+cat /tmp/python-runtime-packages.txt /tmp/media-runtime-packages.txt \
+    | sort -u > /tmp/php-media-kit-runtime-packages.txt
+test -s /tmp/php-media-kit-runtime-packages.txt
+RUNTIME_PACKAGES
+
+# The final image starts clean, so development headers, compilers and downloaded
+# source trees remain in cacheable builder layers rather than the runtime image.
+FROM php-base AS runtime
+
+COPY --from=media-builder /tmp/php-media-kit-runtime-packages.txt /tmp/php-media-kit-runtime-packages.txt
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+      ca-certificates tzdata curl zip fonts-dejavu-core ghostscript \
+      imagemagick-7-common \
+      libheif-plugin-libde265 libheif-plugin-x265 \
+      libheif-plugin-aomdec libheif-plugin-aomenc libheif-plugin-dav1d \
+      $(cat /tmp/php-media-kit-runtime-packages.txt); \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS; \
+    rm -rf /var/lib/apt/lists/* /tmp/php-media-kit-runtime-packages.txt
+
+COPY --from=media-builder /usr/local/ /usr/local/
+COPY --from=media-builder /etc/ImageMagick-7/ /etc/ImageMagick-7/
+RUN set -eux; \
+    ldconfig; \
+    ffmpeg -version; \
+    magick -version; \
+    python3 -c 'import bz2, ctypes, dbm.gnu, decimal, lzma, sqlite3, ssl, zlib'; \
+    php --ri imagick
+
+# --- Python AAF tooling (latest stable pyaaf2 from PyPI) ---
+RUN python3 -m venv /opt/pyaaf2/venv \
+ && /opt/pyaaf2/venv/bin/python -m pip install --no-cache-dir --upgrade pyaaf2 \
+ && /opt/pyaaf2/venv/bin/python -m pip check
+
+# --- OPcache disabled by default (parity with the compatibility builds) ---
+RUN printf "opcache.enable=0\nopcache.enable_cli=0\n" \
+  > /usr/local/etc/php/conf.d/zz-opcache-off.ini
+
+# --- PHPMailer via Composer vendor (global autoload) ---
+RUN install -d /usr/local/lib/php-vendor
+COPY --from=deps /app/vendor /usr/local/lib/php-vendor
+RUN printf 'auto_prepend_file=/usr/local/lib/php-vendor/autoload.php\n' \
+  > /usr/local/etc/php/conf.d/10-phpmailer-autoload.ini
+
+# --- Apache hardening + logs to stdout + switch to :8080 ---
+RUN a2enmod rewrite headers deflate expires remoteip \
+ && a2dismod -f autoindex status \
+ && { echo 'ErrorLog /proc/self/fd/2'; echo 'CustomLog /proc/self/fd/1 combined'; } \
+      > /etc/apache2/conf-available/log-to-stdout.conf \
+ && a2enconf log-to-stdout \
+ && sed -ri 's/^Listen 80/Listen 8080/' /etc/apache2/ports.conf \
+ && sed -ri 's#<VirtualHost \*:80>#<VirtualHost *:8080>#' /etc/apache2/sites-available/000-default.conf \
+ && sed -ri 's#</VirtualHost>#\tIncludeOptional /opt/apache-extra/*.conf\n</VirtualHost>#' /etc/apache2/sites-available/000-default.conf \
+ && { \
+      echo 'ServerTokens Prod'; \
+      echo 'ServerSignature Off'; \
+      echo 'TraceEnable Off'; \
+      echo 'Header always set X-Content-Type-Options "nosniff"'; \
+      echo 'Header always set X-Frame-Options "DENY"'; \
+      echo 'Header always set Referrer-Policy "no-referrer-when-downgrade"'; \
+      echo 'Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"'; \
+    } > /etc/apache2/conf-available/security.conf \
+ && a2enconf security \
+ && { \
+      echo '<Directory /var/www/>'; \
+      echo '  Options -Indexes -Includes -ExecCGI'; \
+      echo '  AllowOverride All'; \
+      echo '  Require all granted'; \
+      echo '</Directory>'; \
+    } > /etc/apache2/conf-available/security-extra.conf \
+ && a2enconf security-extra \
+ && { \
+      echo 'Alias /files/ /var/www/data/'; \
+      echo '<Directory /var/www/data>'; \
+      echo '  Options -Indexes -ExecCGI'; \
+      echo '  AllowOverride None'; \
+      echo '  Require all granted'; \
+      echo '  php_admin_flag engine off'; \
+      echo '  <FilesMatch "\\.php$">'; \
+      echo '    Require all denied'; \
+      echo '  </FilesMatch>'; \
+      echo '</Directory>'; \
+    } > /etc/apache2/conf-available/files.conf \
+ && a2enconf files \
+ && apache2ctl -t
+
+RUN printf "<?php http_response_code(200); echo 'OK';" > /var/www/html/health.php
+COPY docker-php-entrypoint.sh /usr/local/bin/docker-php-entrypoint
+RUN chmod +x /usr/local/bin/docker-php-entrypoint
+
+RUN chown -R root:root /var/www \
+ && find /var/www -type d -exec chmod 755 {} \; \
+ && find /var/www -type f -exec chmod 644 {} \; \
+ && install -d /var/www/data && chown -R www-data:www-data /var/www/data
+
+WORKDIR /var/www/html
+USER www-data
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -fsS http://localhost:8080/health.php || exit 1
+
+ENTRYPOINT ["docker-php-entrypoint"]
+CMD ["apache2ctl","-D","FOREGROUND"]

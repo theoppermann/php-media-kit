@@ -1,5 +1,8 @@
 ### Optional: Framework Uploads (/uploads)
 
+This is an optional project setup for any of the five [build variants](builds.md).
+It is not part of the default storage setup.
+
 The default Compose file mounts `./data` at `/var/www/html/data`. With the stock
 virtual host, that directory is inside the document root and can be served at
 `/data/`. HTTP access and PHP execution there depend on the project's Apache
@@ -62,8 +65,14 @@ The stock virtual host includes files from this override directory. If your
 project replaces the virtual host, include this configuration in that vhost or
 add the directory include described in [Apache overrides](override.md).
 Restart Apache with `docker compose restart web` after changing the override.
+Use the same variant `-f` options and Compose project name for these commands,
+and adjust test URLs to your deployment's published port.
 
 Choose the storage path your application expects. For private uploads, configure
 the project's document root or HTTP access rules so files are served through the
 application's access checks. Neither the default `/data/` mount nor an optional
 `/uploads/` mount provides those checks automatically.
+
+Python/AAF processing can use the shared `/opt/pyaaf2/venv/bin/python` and `/tmp`
+for intermediate files. `/tmp` is temporary storage; save completed output in
+the application's configured persistent mount.

@@ -1,5 +1,9 @@
 # Apache Overrides
 
+All five build variants provide the same Apache override directory and runtime
+configuration interface. The default selects the current Trixie build; choose
+the previous or compatibility build independently using [Build choices](builds.md).
+
 - The container includes an extra include directory baked in:
 
   - IncludeOptional /opt/apache-extra/*.conf
@@ -24,9 +28,12 @@ the wildcard's directory.
 - The mount is read_only, so the container cannot modify your files.
 - You can create as many files as you like, and control the order with prefixes like 10-…, 50-…, 90-….
 
+Use the same variant `-f` options and Compose project name with every command
+below. Adjust the test URL if your deployment changes the default host port 80.
+
 ### Example 1: Gzip + cache headers
 ```
-nano ./conf/apache-conf/50-cache.conf:
+nano ./conf/apache-conf/50-cache.conf
 ```
 paste this
 ```
@@ -50,14 +57,16 @@ docker compose restart web
 
 Test with:
 ```
-curl -I http://localhost/health.php
+curl --compressed -sS -D - -o /dev/null http://localhost/health.php
 ```
 
-You should see Content-Encoding: gzip and Expires headers.
+Check for `Expires` on matching content types. `Content-Encoding: gzip` appears
+when Apache compresses an eligible response; test representative application
+content rather than relying only on the small health response.
 
 ### Example 2: Security headers (HSTS + CSP)
 ```
-nano ./conf/apache-conf/80-security-extra.conf:
+nano ./conf/apache-conf/80-security-extra.conf
 ```
 paste this:
 ```

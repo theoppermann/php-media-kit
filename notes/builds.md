@@ -1,46 +1,70 @@
-### Alternatives
+### Build choices
 
-This stack supports multiple Debian + PHP + Imagick combinations.  
-Pick the variant that matches your environment:
+Five builds are available. `docker-compose.yml` selects the current default,
+`Dockerfile.trixie-current`. Add the matching variant Compose file when choosing
+another build, and use the same files for every Compose command.
 
-`docker-compose.yml` selects the Debian Trixie apt build by default. Add one of
-the variant Compose files below to select a different Dockerfile, and use the
-same files for every Compose command.
+### Current default: upstream stable tools on Debian Trixie
 
-- **Debian Trixie (apt-only):**  
-  `docker-compose.trixie-debian.yml`  
-  - Debian 13 • PHP **8.4** (from Debian’s repos)  
-  - ImageMagick **7** + `php-imagick` **3.8.x** (apt package)
-  - Recommended: simplest setup, no PECL build step, fully managed by apt.  
+`docker-compose.trixie-current.yml` / `Dockerfile.trixie-current`
 
-- **Debian Bookworm (apt-only):**  
-  `docker-compose.bookworm-debian.yml`  
-  - Debian 12 • PHP **8.2** (from Debian’s repos)  
-  - ImageMagick **6** + `php-imagick` **3.7.x** (apt package)  
-  - Choose this only if you must stay on Debian 12 LTS.  
+The October 2026 cycle starts with PHP **8.5** and Python **3.15**. The image tags
+float with the stable channels, so later fresh builds can select newer stable
+series. The previous and compatibility recipes retain their existing PHP series.
 
-- **Debian Trixie + official PHP (PECL imagick):**  
-  `docker-compose.trixie-im7.yml`  
-  - Debian 13 • PHP **8.3** (from the official `php:8.3-apache-trixie` image)
-  - ImageMagick **7** + PECL `imagick` **3.8.0** (built during image build)  
-  - Use this if you prefer upstream PHP releases or need imagick pinned via PECL.  
+- Debian 13 with the official stable `php:apache-trixie` image.
+- Python 3 from the official stable `python:3-slim-trixie` image, with venv support.
+- Latest stable ImageMagick and FFmpeg built from source, with HEIC/AVIF and HEVC/H.265 support.
+- Stable Imagick installed from PECL; latest compatible stable PHPMailer from Composer.
+- Latest compatible stable `pyaaf2` installed from PyPI.
 
-- **Debian Bookworm + official PHP (PECL imagick):**  
-  `docker-compose.bookworm-php.yml`  
-  - Debian 12 • PHP **8.3** (from official `php:*` images)  
-  - ImageMagick **6** + PECL `imagick` **3.8.0** (built during image build)  
-  - Legacy option if you need PHP 8.3 on Debian 12.  
+This is the default for new projects. Versions follow the stable release channels
+when their build steps run. Source compilation takes longer than installing
+Debian media packages. Cached layers retain the versions previously installed;
+use `build --no-cache --pull` with the selected Compose files to refresh the base
+images and rerun the installation steps. Use the PHP diagnostic page and Python
+checks in the README to inspect a particular image.
 
----
+### Previous default: Debian-packaged PHP 8.4
 
-### Quick choose
+`docker-compose.trixie-debian.yml` / `Dockerfile.trixie-debian`
 
--  **Want newest Debian stack, minimal maintenance, and apt-only updates?**  
-  → `docker-compose.trixie-debian.yml` (recommended)
+- Debian 13 with PHP **8.4** from Debian's repositories.
+- ImageMagick **7**, `php-imagick` **3.8.x**, FFmpeg and PHPMailer from Debian packages.
+- Debian's Python 3 with venv support and the shared `pyaaf2` installation.
 
--  **Stuck on Debian 12 LTS?**  
-  → `docker-compose.bookworm-debian.yml`
+Use this option to retain the previous PHP and media package choices. It has the
+common Python/AAF addition; it does not switch PHP or the media tools to upstream
+source builds.
 
--  **Prefer official `php:*` images or need to pin imagick via PECL?**  
-  → `docker-compose.trixie-im7.yml` (Debian 13)  
-  → `docker-compose.bookworm-php.yml` (Debian 12, legacy)
+### Retained compatibility and legacy builds
+
+These original variants remain available for existing deployments:
+
+- **Trixie with upstream PHP 8.3:** `docker-compose.trixie-im7.yml` /
+  `Dockerfile.trixie-im7`. Debian 13, PHP **8.3**, Debian ImageMagick **7** and
+  PECL Imagick **3.8.0**.
+- **Bookworm with upstream PHP 8.3:** `docker-compose.bookworm-php.yml` /
+  `Dockerfile.bookworm-php`. Debian 12, PHP **8.3**, Debian ImageMagick **6** and
+  PECL Imagick **3.8.0**.
+- **Bookworm with Debian PHP 8.2 (legacy):** `docker-compose.bookworm-debian.yml` /
+  `Dockerfile.bookworm-debian`. Debian 12, PHP **8.2**, ImageMagick **6** and
+  `php-imagick` **3.7.x** from Debian packages. Retained for existing projects;
+  use a Trixie build for new projects.
+
+The compatibility and legacy variants keep their existing PHP and media package
+choices and add Debian's Python 3, venv support and `pyaaf2`.
+
+### Shared Python and AAF environment
+
+All five builds install `pyaaf2` into `/opt/pyaaf2/venv` during the image build.
+The latest compatible stable library release is selected whenever that
+installation step runs. The environment is outside the code/data mounts and is
+available to the web user with a read-only root filesystem; `/tmp` remains the
+writable, temporary workspace. See [Python and AAF tools](../README.md#python-and-aaf-tools-all-builds)
+for usage and the smoke test.
+
+The [media codec smoke test](../README.md#media-codec-smoke-test) checks real
+HEIC/AVIF decoding and HEVC/H.265 encoding/decoding. Enable `--heif-encode` on
+the current build to check both image encoders too; compatibility builds retain
+their existing encoder availability.

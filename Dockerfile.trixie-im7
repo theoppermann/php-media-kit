@@ -21,7 +21,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # --- Runtime libs (IM7 + HEIC/AVIF + ffmpeg + zip runtime) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates tzdata curl \
+      ca-certificates tzdata curl python3 python3-venv \
       imagemagick-7.q16 libmagickwand-7.q16-10 libheif1 libde265-0 \
       ffmpeg zip \
       libsqlite3-0 libzip5 zlib1g \
@@ -38,6 +38,11 @@ RUN set -eux; \
   apt-get purge -y --auto-remove \
       $PHPIZE_DEPS libsqlite3-dev libzip-dev libmagickwand-7.q16-dev; \
   rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# --- Python AAF tooling (latest stable pyaaf2 from PyPI) ---
+RUN python3 -m venv /opt/pyaaf2/venv \
+ && /opt/pyaaf2/venv/bin/python -m pip install --no-cache-dir --upgrade pyaaf2 \
+ && /opt/pyaaf2/venv/bin/python -m pip check
 
 # --- OPcache disabled by default (parity with other stacks) ---
 RUN printf "opcache.enable=0\nopcache.enable_cli=0\n" \

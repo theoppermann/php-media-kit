@@ -33,8 +33,9 @@ and PHPMailer from Debian packages. Its PHP and media package choices are
 preserved, with the shared Python/AAF tools added.
 
 Moving a project to the current default also switches from Debian-packaged PHP
-to the official PHP layout. Projects with their own PHP INI bind mounts or custom
-entrypoints should match the selected layout; see [PHP configuration migration](notes/conf.md#php-configuration-layout-and-migration).
+to the official PHP layout. Existing projects should follow
+[Upgrade an existing installation](#upgrade-an-existing-installation) below,
+including the PHP INI mount and custom entrypoint changes.
 Select `docker-compose.trixie-debian.yml` explicitly to retain the previous
 PHP 8.4/media stack and INI layout with the Python/AAF addition.
 
@@ -45,7 +46,172 @@ See [Build choices](notes/builds.md) for all five variants.
 
 ---
 
+## Upgrade an existing installation
+
+This guide moves the previous `trixie-debian` default (Debian-packaged PHP 8.4)
+to `trixie-current` (the official PHP image, PHP 8.5 for the October 2026 cycle).
+Both use Debian Trixie. The PHP installation layout changes; your application
+and data do not need to move.
+
+### 1. Keep your deployment configuration and update the build files
+
+Work from your existing project directory and keep the same Compose project name
+(`-p` or `COMPOSE_PROJECT_NAME`). Back up your Compose files, `conf/`, custom
+entrypoint, `.env` and secrets before editing them. Store configuration backups
+outside the Apache snippet directory so they cannot be included as extra `.conf`
+files. Tag the running image for rollback, replacing `my-project-web` with a
+name unique to this deployment:
+
+```sh
+docker image tag \
+  "$(docker inspect --format '{{.Image}}' "$(docker compose ps -q web)")" \
+  my-project-web:before-current
+```
+
+Use your currently deployed `-p` and `-f` options for that command. For an
+existing Git checkout, update the repository with:
+
+```sh
+git pull --ff-only
+```
+
+If Git stops because tracked project files have local changes, merge the
+upstream changes while retaining your project configuration. In particular,
+preserve a project-owned `docker-php-entrypoint.sh` before updating the kit's
+file of the same name. If your normal deployment uses a fresh clone, carry over
+your project configuration and keep bind mounts pointing to the existing host
+files and data; cloning alone does not copy them.
+
+Keep your existing Compose settings for code, local/NFS data, Apache snippets,
+replacement virtual host, custom entrypoint mount, ports, users/groups,
+read/write permissions, environment variables and secrets. For example,
+`/var/www/html/data`, `/opt/apache-extra`,
+`/etc/apache2/sites-enabled/000-default.conf` and a project document root such as
+`/var/www/html/public` remain valid. Retain your project's Apache access rules.
+
+### 2. Select the new build in your existing Compose file
+
+With the updated kit files in your project directory, set:
+
+```yaml
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.trixie-current
+```
+
+Merge this build setting into your own Compose file; keep the rest of your
+deployment configuration. If you select variants with `-f` options, replace
+`docker-compose.trixie-debian.yml` with `docker-compose.trixie-current.yml` in
+your commands. The old selector would otherwise continue choosing the old build.
+Keep your other project override files and their order.
+
+### 3. Update PHP configuration mount targets
+
+Change the **container target**, keeping the existing host source file if desired:
+
+| Previous container path | New container path |
+| --- | --- |
+| `/etc/php/8.4/apache2/conf.d/<name>.ini` | `/usr/local/etc/php/conf.d/<name>.ini` |
+| `/etc/php/8.4/cli/conf.d/<name>.ini` | `/usr/local/etc/php/conf.d/<name>.ini` |
+| `/etc/php/8.4/apache2/php.ini` or `/etc/php/8.4/cli/php.ini` (if mounted) | `/usr/local/etc/php/php.ini` |
+
+For example, an existing upload-settings file can stay at its current host path:
+
+```yaml
+      - type: bind
+        source: ./conf/php/8.4/apache2/conf.d/90-uploads.ini
+        target: /usr/local/etc/php/conf.d/90-uploads.ini
+        read_only: true
+```
+
+Apache and CLI now share this configuration directory. Consolidate duplicated
+settings before replacing separate Apache/CLI mounts; do not mount two files
+over the same target. Remove any old `/etc/php/8.4/fpm/...` mounts: this image
+runs Apache with PHP, without PHP-FPM.
+
+Mount individual custom INI files rather than an entire old `conf.d` directory,
+which would hide the new image's extension and PHPMailer configuration. Review
+distribution-specific paths and extension settings before reusing a full
+`php.ini`. Existing Compose `PHP_*` runtime settings can remain in place when
+your entrypoint handles them. See [Runtime configuration](notes/conf.md).
+
+### 4. Check a custom entrypoint
+
+The kit's standard entrypoint already supports the new PHP layout. A project
+that replaces it should retain its application/worker startup logic and check
+for hardcoded `/etc/php/8.4/...`, `/usr/bin/php` or `php8.4` references. Use `php`
+from `PATH` (the new image provides `/usr/local/bin/php`).
+
+If your script generates runtime INI files in `/tmp/php-conf.d`, preserve PHP's
+compiled configuration directory and append that runtime directory:
+
+```sh
+export PHP_INI_SCAN_DIR=:/tmp/php-conf.d
+```
+
+The empty component before `:` includes the image's default scan directory.
+Keep this setting in the environment of Apache and any PHP workers your script
+starts. Selecting the new Dockerfile does not replace a bind-mounted custom
+entrypoint with the kit's script.
+
+### 5. Build, recreate and verify
+
+Use the same project name and selected Compose files for **every** command.
+The examples below use `docker compose` alone; add your project options and
+the new variant selector if required:
+
+```sh
+docker compose config --quiet
+docker compose build --no-cache --pull web
+docker compose up -d --no-build --no-deps --wait web
+docker compose exec -T web php -v
+docker compose exec -T web php --ini
+docker compose exec -T web /opt/pyaaf2/venv/bin/python -c "import aaf2; print('AAF tools OK')"
+docker compose logs --tail=100 web
+```
+
+The build can run while the existing container serves requests. Recreating
+`web` causes a short interruption and preserves its configured mounts. Confirm
+that the application, uploads/data access, custom PHP limits, Apache rules and
+any workers behave as expected with the new PHP version. The existing health
+endpoint must remain reachable at `/health.php` under your document root.
+
+`php --ini` shows the CLI's default and mounted configuration. To also inspect
+the runtime files generated by your entrypoint, use:
+
+```sh
+docker compose exec -T web env PHP_INI_SCAN_DIR=:/tmp/php-conf.d php --ini
+```
+
+Run the [Python/AAF smoke test](#python-and-aaf-tools-all-builds) and
+[media codec smoke test](#media-codec-smoke-test) for additional checks.
+
+### Roll back if needed
+
+Restore the saved Compose files, PHP configuration and custom entrypoint.
+Select the saved image explicitly in a final override file named
+`docker-compose.rollback.yml`:
+
+```yaml
+services:
+  web:
+    image: my-project-web:before-current
+```
+
+Append this override **last** to your original Compose file options, using the
+same project name, then recreate `web` with `up -d --no-build --pull never --no-deps web`.
+This runs the saved image with the restored configuration; choosing the old
+Dockerfile alone does not restore the old image. No data move or volume deletion
+is needed for the upgrade or rollback.
+
+---
+
 ## Setup
+
+The following steps are for a new installation. For an existing deployment, use
+[Upgrade an existing installation](#upgrade-an-existing-installation).
 
 #### Clone the repository (replace `webserver01` with your project folder name)
 ```

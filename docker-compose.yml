@@ -23,7 +23,7 @@ services:
 
     volumes:
       # Code directory:
-      # ⚠️ Default is read-only for security.
+      # Default is read-only for security.
       # Set `read_only: false` during development if you need to edit code inside the container.
       - type: bind
         source: ./www

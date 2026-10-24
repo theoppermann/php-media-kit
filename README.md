@@ -49,6 +49,9 @@ See [Build choices](notes/builds.md) for all five variants.
 
 The following steps are for a new installation. For an existing deployment, use
 [Upgrade an existing installation](notes/upgrade.md).
+Projects with their own local Compose can also
+[build directly from GitHub](notes/upgrade.md#projects-with-local-files) with one
+Compose command, without keeping their application files in Git.
 
 #### Clone the repository (replace `webserver01` with your project folder name)
 ```

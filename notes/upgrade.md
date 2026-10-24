@@ -3,24 +3,39 @@
 Move from `trixie-debian` (Debian PHP 8.4) to `trixie-current` (official PHP
 image, PHP 8.5 for the October 2026 cycle). Both use Debian Trixie.
 
-## Pull and rebuild
+## Projects with local files
 
-With the repository's default Compose and PHP configuration, run from your
-existing project directory:
+Your application and Compose files do not need to be in Git. To fetch the build
+files directly from php-media-kit, back up your configuration and set this build
+section once in your local Compose:
+
+```yaml
+services:
+  web:
+    build:
+      context: https://github.com/theoppermann/php-media-kit.git#main
+      dockerfile: Dockerfile.trixie-current
+      pull: true
+```
+
+After applying any relevant PHP adjustments below, build and start with:
 
 ```sh
-git pull --ff-only
 docker compose up -d --build
 ```
 
-The updated `docker-compose.yml` already selects `Dockerfile.trixie-current`.
-No manual build selection is needed. Keep the same Compose project name,
-mounts and project overrides. Your application and local/NFS data stay in place.
+Docker fetches the kit automatically. Keep your other Compose settings, project
+name, mounts, custom entrypoint, `.env` and secrets. Relative bind sources still
+refer to your local Compose directory. No application repository, manual image
+tagging or separate clone is required.
 
-Back up custom configuration before updating. If Git reports local changes,
-retain them when incorporating the upstream changes. If you have customized
-PHP configuration or explicitly selected the old build, apply the relevant
-notes below before rebuilding.
+`pull: true` refreshes the base images. Docker can still reuse cached package
+installation layers; use `docker compose build --no-cache web` when you want
+to refresh those too.
+
+If you already build from a local php-media-kit checkout, you can keep that
+workflow: update the kit with `git pull --ff-only`, then run
+`docker compose up -d --build`, retaining your local project configuration.
 
 ## Only for customized setups
 

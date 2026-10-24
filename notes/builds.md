@@ -22,8 +22,18 @@ This is the default for new projects. Versions follow the stable release channel
 when their build steps run. Source compilation takes longer than installing
 Debian media packages. Cached layers retain the versions previously installed;
 use `build --no-cache --pull` with the selected Compose files to refresh the base
-images and rerun the installation steps. Use the PHP diagnostic page and Python
-checks in the README to inspect a particular image.
+images and rerun the installation steps. Use the [verification checks](testing.md)
+to inspect a particular image.
+
+To select the previous default, for example:
+
+```sh
+docker compose -f docker-compose.yml -f docker-compose.trixie-debian.yml up -d --build
+```
+
+Replace the variant filename to choose another build. Keep the same `-f` options
+for later build, stop and logs commands. `docker-compose.trixie-current.yml`
+selects the current default explicitly.
 
 ### Previous default: Debian-packaged PHP 8.4
 
@@ -61,10 +71,10 @@ All five builds install `pyaaf2` into `/opt/pyaaf2/venv` during the image build.
 The latest compatible stable library release is selected whenever that
 installation step runs. The environment is outside the code/data mounts and is
 available to the web user with a read-only root filesystem; `/tmp` remains the
-writable, temporary workspace. See [Python and AAF tools](../README.md#python-and-aaf-tools-all-builds)
-for usage and the smoke test.
+writable, temporary workspace. See [Python and AAF tools](python.md)
+for usage and the [AAF smoke test](testing.md#python-and-aaf).
 
-The [media codec smoke test](../README.md#media-codec-smoke-test) checks real
+The [media codec smoke test](testing.md#media-codecs) checks real
 HEIC/AVIF decoding and HEVC/H.265 encoding/decoding. Enable `--heif-encode` on
 the current build to check both image encoders too; compatibility builds retain
 their existing encoder availability.

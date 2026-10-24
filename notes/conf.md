@@ -85,7 +85,8 @@ temporary files. Persistent output belongs in a configured data mount.
 The current build follows the upstream stable Python image; the previous and
 compatibility builds use their Debian Python packages. Rebuild with
 `--no-cache --pull` to refresh the unpinned stable `pyaaf2` installation and the
-selected build's release channels. See the [Python usage and smoke test](../README.md#python-and-aaf-tools-all-builds).
+selected build's release channels. See [Python usage](python.md) and the
+[AAF smoke test](testing.md#python-and-aaf).
 
 ### Mail configuration
 

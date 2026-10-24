@@ -55,7 +55,8 @@ the venv writable.
 Use the existing `/tmp` tmpfs for temporary processing files or disposable
 virtual environments. The web user (UID 33) can write there; those files are
 discarded when the container stops. Save output that must persist to the
-configured data mount. See [Python usage and the smoke test](../README.md#python-and-aaf-tools-all-builds).
+configured data mount. See [Python usage](python.md) and the
+[AAF smoke test](testing.md#python-and-aaf).
 
 The supplied `/tmp` tmpfs is mounted `noexec`. For a disposable venv there, use
 `python3 -m venv --symlinks /tmp/my-venv` and invoke pip as
@@ -85,4 +86,29 @@ docker compose -f docker-compose.yml -f docker-compose.trixie-debian.yml -f dock
 
 Use the same files and Compose project name for subsequent commands. For several
 projects on one host, also override the fixed container name and published host
-port as described in the [README](../README.md#notes).
+port as described under [Multiple projects](#multiple-projects).
+
+### Multiple projects
+
+Use a separate project directory and a unique Compose project name for each
+deployment, with `-p <project-name>` or `COMPOSE_PROJECT_NAME`. Compose generates
+image names such as `<project-name>-web`. Keep the same project name and selected
+`-f` files for every command for that deployment.
+
+Also remove or override the fixed `container_name: webserv01` and published host
+port `80` in each project's Compose configuration to avoid collisions.
+
+Different image tags can share an image ID or layers when their content is
+identical. This Docker storage deduplication does not share the containers'
+runtime configuration or data mounts.
+
+### Container access and local files
+
+```sh
+docker ps
+docker compose exec web sh
+```
+
+The default root filesystem is read-only and `/tmp` is temporary storage.
+Keep secrets, runtime data and caches out of source control; the supplied
+`.gitignore` includes the default exclusions.

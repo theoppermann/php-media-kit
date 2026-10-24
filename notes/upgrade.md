@@ -96,6 +96,5 @@ docker compose logs --tail=100 web
 Recreation causes a short interruption and preserves the configured mounts.
 Check your application, data access, PHP limits and workers afterwards.
 
-See [runtime configuration](conf.md) for more detail and the
-[README smoke tests](../README.md#python-and-aaf-tools-all-builds) for Python/AAF
-and media checks.
+See [runtime configuration](conf.md) for more detail and
+[verification tests](testing.md) for Python/AAF and media checks.

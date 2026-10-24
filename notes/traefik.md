@@ -16,7 +16,7 @@ For a project-specific proxy deployment:
    networks when using forwarded client-IP information. See [Runtime configuration](conf.md).
 4. Replace the base Compose host-port mapping and fixed `container_name` as
    needed. Distinct Compose project names do not remove those fixed-value
-   collisions; see [Multiple-project notes](../README.md#notes).
+   collisions; see [Multiple-project notes](dev.md#multiple-projects).
 
 The container health check continues to use
 `http://localhost:8080/health.php` internally. Keep that endpoint under your

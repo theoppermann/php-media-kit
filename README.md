@@ -33,9 +33,8 @@ and PHPMailer from Debian packages. Its PHP and media package choices are
 preserved, with the shared Python/AAF tools added.
 
 Moving a project to the current default also switches from Debian-packaged PHP
-to the official PHP layout. Existing projects should follow
-[Upgrade an existing installation](notes/upgrade.md),
-including the PHP INI mount and custom entrypoint changes.
+to the official PHP layout. See [Upgrade an existing installation](notes/upgrade.md)
+for pull/build commands and any project-specific PHP adjustments.
 Select `docker-compose.trixie-debian.yml` explicitly to retain the previous
 PHP 8.4/media stack and INI layout with the Python/AAF addition.
 
